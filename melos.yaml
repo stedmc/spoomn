@@ -1,0 +1,36 @@
+name: spoomn
+repository: https://github.com/smcara/spoomn
+
+packages:
+  - packages/**
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: melos exec -- dart analyze
+    description: Analyze all packages
+
+  test:
+    run: melos exec -- dart test
+    description: Test all packages
+
+  test:client:
+    run: flutter test
+    packageFilters:
+      scope: spoomn_client
+    description: Run client tests
+
+  gen:
+    run: melos exec --depends-on="build_runner" -- dart run build_runner build --delete-conflicting-outputs
+    description: Run code generation in all packages that need it
+
+  clean:
+    run: melos exec -- dart run build_runner clean
+    description: Clean generated files
+
+  format:
+    run: melos exec -- dart format .
+    description: Format all packages

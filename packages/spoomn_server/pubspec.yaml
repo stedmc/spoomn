@@ -1,0 +1,18 @@
+name: spoomn_server
+description: Dart Shelf game server for Spoomn.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  collection: ^1.18.0
+  shelf: ^1.4.1
+  shelf_router: ^1.1.4
+  supabase: ^2.2.4
+  spoomn_core:
+    path: ../spoomn_core
+
+dev_dependencies:
+  test: ^1.25.0
