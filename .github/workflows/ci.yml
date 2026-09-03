@@ -29,10 +29,6 @@ jobs:
     name: Server (analyze + test)
     runs-on: ubuntu-latest
     needs: core
-    if: |
-      github.event_name == 'pull_request' ||
-      contains(toJson(github.event.commits.*.modified), 'packages/spoomn_server') ||
-      contains(toJson(github.event.commits.*.modified), 'packages/spoomn_core')
     steps:
       - uses: actions/checkout@v4
       - uses: dart-lang/setup-dart@v1
@@ -56,10 +52,6 @@ jobs:
     name: Client (analyze + test)
     runs-on: ubuntu-latest
     needs: core
-    if: |
-      github.event_name == 'pull_request' ||
-      contains(toJson(github.event.commits.*.modified), 'packages/spoomn_client') ||
-      contains(toJson(github.event.commits.*.modified), 'packages/spoomn_core')
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -88,11 +80,7 @@ jobs:
     name: Deploy server to Fly.io
     runs-on: ubuntu-latest
     needs: [core, server]
-    if: |
-      github.ref == 'refs/heads/main' && (
-        contains(toJson(github.event.commits.*.modified), 'packages/spoomn_server') ||
-        contains(toJson(github.event.commits.*.modified), 'packages/spoomn_core')
-      )
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - uses: superfly/flyctl-actions/setup-flyctl@master
@@ -105,11 +93,7 @@ jobs:
     name: Deploy client to Cloudflare Pages
     runs-on: ubuntu-latest
     needs: [core, client]
-    if: |
-      github.ref == 'refs/heads/main' && (
-        contains(toJson(github.event.commits.*.modified), 'packages/spoomn_client') ||
-        contains(toJson(github.event.commits.*.modified), 'packages/spoomn_core')
-      )
+    if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
