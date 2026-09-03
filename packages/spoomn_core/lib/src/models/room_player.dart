@@ -4,7 +4,7 @@ part 'room_player.freezed.dart';
 part 'room_player.g.dart';
 
 @freezed
-class RoomPlayer with _$RoomPlayer {
+abstract class RoomPlayer with _$RoomPlayer {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory RoomPlayer({
     required String id,

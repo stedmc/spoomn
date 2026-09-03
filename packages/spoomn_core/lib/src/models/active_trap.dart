@@ -4,7 +4,7 @@ part 'active_trap.freezed.dart';
 part 'active_trap.g.dart';
 
 @freezed
-class ActiveTrap with _$ActiveTrap {
+abstract class ActiveTrap with _$ActiveTrap {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory ActiveTrap({
     required String id,

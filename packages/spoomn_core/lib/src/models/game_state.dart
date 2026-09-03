@@ -5,7 +5,7 @@ part 'game_state.freezed.dart';
 part 'game_state.g.dart';
 
 @freezed
-class JailStatus with _$JailStatus {
+abstract class JailStatus with _$JailStatus {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory JailStatus({
     required bool inJail,
@@ -22,7 +22,7 @@ class JailStatus with _$JailStatus {
 }
 
 @freezed
-class PolicePawn with _$PolicePawn {
+abstract class PolicePawn with _$PolicePawn {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory PolicePawn({
     required String ownerId,
@@ -35,7 +35,7 @@ class PolicePawn with _$PolicePawn {
 }
 
 @freezed
-class GameState with _$GameState {
+abstract class GameState with _$GameState {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory GameState({
     required String roomId,

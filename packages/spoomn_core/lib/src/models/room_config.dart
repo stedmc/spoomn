@@ -4,7 +4,7 @@ part 'room_config.freezed.dart';
 part 'room_config.g.dart';
 
 @freezed
-class RoomConfig with _$RoomConfig {
+abstract class RoomConfig with _$RoomConfig {
   const factory RoomConfig({
     required String roomId,
     // Setup

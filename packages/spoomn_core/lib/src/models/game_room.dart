@@ -7,7 +7,7 @@ part 'game_room.g.dart';
 enum GameRoomStatus { lobby, starting, active, paused, finished }
 
 @freezed
-class GameRoom with _$GameRoom {
+abstract class GameRoom with _$GameRoom {
   @JsonSerializable(fieldRename: FieldRename.snake)
   const factory GameRoom({
     required String id,
