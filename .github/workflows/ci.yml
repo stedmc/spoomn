@@ -22,7 +22,7 @@ jobs:
         run: dart analyze --fatal-infos
         working-directory: packages/spoomn_core
       - name: Test
-        run: dart test
+        run: if find test -name '*_test.dart' -print -quit 2>/dev/null | grep -q .; then dart test; else echo "No tests found, skipping."; fi
         working-directory: packages/spoomn_core
 
   server:
@@ -45,7 +45,7 @@ jobs:
         run: dart analyze --fatal-infos
         working-directory: packages/spoomn_server
       - name: Test
-        run: dart test
+        run: if find test -name '*_test.dart' -print -quit 2>/dev/null | grep -q .; then dart test; else echo "No tests found, skipping."; fi
         working-directory: packages/spoomn_server
 
   client:
@@ -73,7 +73,7 @@ jobs:
         run: flutter analyze --fatal-infos
         working-directory: packages/spoomn_client
       - name: Test
-        run: flutter test
+        run: if find test -name '*_test.dart' -print -quit 2>/dev/null | grep -q .; then flutter test; else echo "No tests found, skipping."; fi
         working-directory: packages/spoomn_client
 
   deploy-server:
