@@ -16,7 +16,10 @@ jobs:
         run: dart pub get
         working-directory: packages/spoomn_core
       - name: Generate code
-        run: dart run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs --verbose
+        working-directory: packages/spoomn_core
+      - name: Verify generated files
+        run: find lib -name '*.g.dart' -o -name '*.freezed.dart' | sort
         working-directory: packages/spoomn_core
       - name: Analyze
         run: dart analyze --fatal-infos
