@@ -25,7 +25,7 @@ Handler authMiddleware(AuthedHandler handler) {
       if (user == null) {
         return errorJson(401, 'UNAUTHORIZED', 'Invalid token');
       }
-      return handler(request, user.id);
+      return await handler(request, user.id);
     } on AuthException {
       return errorJson(401, 'UNAUTHORIZED', 'Token verification failed');
     }
