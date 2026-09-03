@@ -25,6 +25,7 @@ Router buildRouter() {
     ..post('/api/rooms/<roomId>/begin', authMiddleware(beginGame))
     ..post('/api/rooms/<roomId>/config', authMiddleware(updateRoomConfig))
     ..post('/api/rooms/<roomId>/debug-add-player', authMiddleware(debugAddPlayer))
+    ..post('/api/rooms/<roomId>/remove-player', authMiddleware(removePlayer))
     ..post('/api/rooms/<roomId>/pause', authMiddleware(pauseRoom))
     ..post('/api/rooms/<roomId>/resume', authMiddleware(resumeRoom))
     ..post('/api/rooms/<roomId>/connect', authMiddleware(connectPlayer))

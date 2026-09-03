@@ -72,14 +72,33 @@ Future<Response> handleAction(Request request, String playerId) async {
     'remove_trap'            => _removeTrap(roomId, effectivePlayerId, payload),
     'bid'                    => auction.submitBid(roomId, effectivePlayerId, stateRow, configRow, payload),
     'pass_bid'               => auction.passBid(roomId, effectivePlayerId, stateRow, configRow),
-    'build_house'            => building.buildHouse(roomId, effectivePlayerId, stateRow, configRow, payload),
-    'build_hotel'            => building.buildHotel(roomId, effectivePlayerId, stateRow, configRow, payload),
-    'sell_house'             => building.sellHouse(roomId, effectivePlayerId, stateRow, configRow, payload),
-    'sell_hotel'             => building.sellHotel(roomId, effectivePlayerId, stateRow, configRow, payload),
-    'mortgage_property'      => mortgage.mortgageProperty(roomId, effectivePlayerId, stateRow, configRow, payload),
-    'unmortgage_property'    => mortgage.unmortgageProperty(roomId, effectivePlayerId, stateRow, configRow, payload),
+    'build_house'            => building.buildHouse(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'build_house', {'square': payload['square']});
+      return r;
+    }),
+    'build_hotel'            => building.buildHotel(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'build_hotel', {'square': payload['square']});
+      return r;
+    }),
+    'sell_house'             => building.sellHouse(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'sell_house', {'square': payload['square']});
+      return r;
+    }),
+    'sell_hotel'             => building.sellHotel(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'sell_hotel', {'square': payload['square']});
+      return r;
+    }),
+    'mortgage_property'      => mortgage.mortgageProperty(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'mortgage_property', {'square': payload['square']});
+      return r;
+    }),
+    'unmortgage_property'    => mortgage.unmortgageProperty(roomId, effectivePlayerId, stateRow, configRow, payload).then((r) async {
+      if (r.statusCode == 200) await _writeLog(roomId, effectivePlayerId, stateRow['turn_number'] as int, 'unmortgage_property', {'square': payload['square']});
+      return r;
+    }),
     'debug_teleport'         => _debugTeleport(roomId, effectivePlayerId, stateRow, configRow, payload),
     'debug_assign_property'  => _debugAssignProperty(roomId, stateRow, configRow, payload),
+    'declare_bankruptcy'     => _declareBankruptcy(roomId, effectivePlayerId, stateRow, configRow, roomRow),
     _                        => Future.value(errorJson(400, 'UNKNOWN_ACTION', 'Unknown action: $action')),
   };
 }
@@ -150,10 +169,16 @@ Future<Response> _rollDice(
   final passedGo = newPos < currentPos;
   positions[playerId] = newPos;
 
+  final rentModifiers = _decrementRollProtections(
+    Map<String, dynamic>.from(state['rent_modifiers'] as Map<String, dynamic>? ?? {}),
+    playerId,
+  );
+
   final updates = <String, dynamic>{
     'dice_roll': roll,
     'consecutive_doubles': consecutiveDoubles,
     'board_positions': positions,
+    'rent_modifiers': rentModifiers,
     'updated_at': DateTime.now().toIso8601String(),
   };
 
@@ -169,19 +194,24 @@ Future<Response> _rollDice(
     updates['balances'] = balances;
   }
 
-  // If balances were modified before landing (e.g. Go salary), carry them
-  // forward so _resolveSquareLanding doesn't overwrite with stale values.
-  final stateForLanding = updates.containsKey('balances')
-      ? (Map<String, dynamic>.from(state)..['balances'] = updates['balances'])
-      : state;
+  // Carry updated positions and balances into landing so card effects
+  // (e.g. "go back 3 spaces") operate on the post-roll position, not the
+  // position before the roll.
+  // Note: stateForLanding keeps the pre-decrement rent_modifiers so that
+  // _resolveSquareLanding can check immunity against the original roll count.
+  final stateForLanding = Map<String, dynamic>.from(state)
+    ..['board_positions'] = positions;
+  if (updates.containsKey('balances')) {
+    stateForLanding['balances'] = updates['balances'];
+  }
 
   await supabase.from('game_state').update(updates).eq('room_id', roomId);
 
-  // Resolve landing square effect and set pending_action
-  await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
-
   await _writeLog(roomId, playerId, state['turn_number'] as int, 'roll_dice',
       {'roll': roll, 'new_position': newPos, 'passed_go': passedGo});
+
+  // Resolve landing square effect and set pending_action
+  await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
 
   return okJson({'roll': roll, 'new_position': newPos, 'passed_go': passedGo});
 }
@@ -591,6 +621,133 @@ Future<void> _endGame(
       {'reason': reason});
 }
 
+Future<Response> _declareBankruptcy(
+  String roomId,
+  String playerId,
+  Map<String, dynamic> state,
+  Map<String, dynamic> config,
+  Map<String, dynamic> room,
+) async {
+  if (room['current_player_id'] != playerId) {
+    return errorJson(403, 'NOT_YOUR_TURN', 'Not your turn');
+  }
+  final balances = state['balances'] as Map<String, dynamic>;
+  final currentBalance = (balances[playerId] as int?) ?? 0;
+  if (currentBalance >= 0) {
+    return errorJson(400, 'RULE_VIOLATION', 'Cannot declare bankruptcy with non-negative balance');
+  }
+
+  final now = DateTime.now().toIso8601String();
+  final bankruptcyAssetsTo = config['bankruptcyAssetsTo'] as String? ?? 'bank';
+
+  // Transfer properties to creditor or bank
+  final ownership = Map<String, dynamic>.from(
+      state['property_ownership'] as Map<String, dynamic>);
+  final pendingAction = state['pending_action'] as Map<String, dynamic>?;
+  final creditorId = pendingAction?['owner_id'] as String?;
+
+  final String? newOwner = bankruptcyAssetsTo == 'creditor' && creditorId != null
+      ? creditorId
+      : null; // null = bank / unowned
+
+  for (final entry in ownership.entries.toList()) {
+    if (entry.value == playerId) {
+      if (newOwner != null) {
+        ownership[entry.key] = newOwner;
+      } else {
+        ownership.remove(entry.key);
+      }
+    }
+  }
+
+  // Clear buildings on bankrupt player's properties
+  final houses = Map<String, dynamic>.from(state['houses'] as Map<String, dynamic>);
+  final hotels = Map<String, dynamic>.from(state['hotels'] as Map<String, dynamic>);
+  for (final key in houses.keys.toList()) {
+    if ((state['property_ownership'] as Map<String, dynamic>)[key] == playerId) {
+      houses.remove(key);
+    }
+  }
+  for (final key in hotels.keys.toList()) {
+    if ((state['property_ownership'] as Map<String, dynamic>)[key] == playerId) {
+      hotels.remove(key);
+    }
+  }
+
+  // Mark player bankrupt
+  await supabase.from('room_players').update({
+    'is_bankrupt': true,
+  }).eq('room_id', roomId).eq('player_id', playerId);
+
+  // Advance to next active (non-bankrupt) player
+  final players = await supabase
+      .from('room_players')
+      .select('player_id, seat_order')
+      .eq('room_id', roomId)
+      .eq('is_bankrupt', false)
+      .neq('player_id', playerId)
+      .isFilter('left_at', null)
+      .order('seat_order');
+
+  final seats = (players as List).cast<Map<String, dynamic>>();
+
+  if (seats.length <= 1) {
+    // Game over
+    await supabase.from('game_state').update({
+      'property_ownership': ownership,
+      'houses': houses,
+      'hotels': hotels,
+      'phase': 'finished',
+      'pending_action': null,
+      'updated_at': now,
+    }).eq('room_id', roomId);
+    await supabase.from('game_rooms').update({
+      'status': 'finished',
+      'finished_at': now,
+    }).eq('id', roomId);
+    await _writeLog(roomId, playerId, state['turn_number'] as int, 'game_over',
+        {'reason': 'bankruptcy'});
+    return okJson({'bankrupt': true, 'game_over': true});
+  }
+
+  // Find next player after the bankrupt one in seat order
+  final allSeats = await supabase
+      .from('room_players')
+      .select('player_id, seat_order')
+      .eq('room_id', roomId)
+      .isFilter('left_at', null)
+      .order('seat_order');
+
+  final allSeatList = (allSeats as List).cast<Map<String, dynamic>>();
+  final currentSeat = allSeatList.indexWhere((p) => p['player_id'] == playerId);
+  String nextPlayerId = seats[0]['player_id'] as String;
+  for (int i = currentSeat + 1; i < allSeatList.length + currentSeat + 1; i++) {
+    final candidate = allSeatList[i % allSeatList.length]['player_id'] as String;
+    if (seats.any((s) => s['player_id'] == candidate)) {
+      nextPlayerId = candidate;
+      break;
+    }
+  }
+
+  await supabase.from('game_state').update({
+    'property_ownership': ownership,
+    'houses': houses,
+    'hotels': hotels,
+    'phase': 'roll',
+    'pending_action': null,
+    'updated_at': now,
+  }).eq('room_id', roomId);
+
+  await supabase.from('game_rooms').update({
+    'current_player_id': nextPlayerId,
+  }).eq('id', roomId);
+
+  await _writeLog(roomId, playerId, state['turn_number'] as int, 'game_over',
+      {'reason': 'player_bankrupt', 'player_id': playerId});
+
+  return okJson({'bankrupt': true, 'next_player': nextPlayerId});
+}
+
 Future<void> _sendTurnNotification(
   String playerId,
   String roomCode,
@@ -755,6 +912,47 @@ Future<Response> _debugAssignProperty(
 // Helpers
 // ---------------------------------------------------------------------------
 
+/// Decrements the `rolls` counter on trade-based rent protections for [playerId].
+/// Removes entries where rolls drop to zero. Returns the updated rent_modifiers map.
+Map<String, dynamic> _decrementRollProtections(
+  Map<String, dynamic> rentModifiers,
+  String playerId,
+) {
+  final result = Map<String, dynamic>.from(rentModifiers);
+  final playerMods = result[playerId] as Map<String, dynamic>?;
+  if (playerMods == null) return result;
+
+  final mods = Map<String, dynamic>.from(playerMods);
+  final protections = (mods['protections'] as List? ?? [])
+      .cast<Map<String, dynamic>>()
+      .map((p) {
+        if (!p.containsKey('rolls')) return p;
+        final remaining = ((p['rolls'] as int?) ?? 0) - 1;
+        return {...p, 'rolls': remaining};
+      })
+      .where((p) => !p.containsKey('rolls') || (p['rolls'] as int) > 0)
+      .toList();
+  mods['protections'] = protections;
+  result[playerId] = mods;
+  return result;
+}
+
+/// Returns true if [playerId] has an active trade-based rent protection
+/// against [ownerId] in the given [rentModifiers].
+bool _hasRentImmunity(
+  Map<String, dynamic> rentModifiers,
+  String playerId,
+  String ownerId,
+) {
+  final playerMods = rentModifiers[playerId] as Map<String, dynamic>?;
+  if (playerMods == null) return false;
+  final protections = (playerMods['protections'] as List? ?? [])
+      .cast<Map<String, dynamic>>();
+  return protections.any(
+    (p) => p['from_player_id'] == ownerId && ((p['rolls'] as int?) ?? 0) > 0,
+  );
+}
+
 Future<Response> _rollDiceInJail(
   String roomId,
   String playerId,
@@ -802,17 +1000,23 @@ Future<Response> _rollDiceInJail(
     final newPos = (currentPos + total) % Board.boardSize;
     positions[playerId] = newPos;
 
+    final jailEscapeRentModifiers = _decrementRollProtections(
+      Map<String, dynamic>.from(state['rent_modifiers'] as Map<String, dynamic>? ?? {}),
+      playerId,
+    );
+
     await supabase.from('game_state').update({
       'jail_status': jailStatus,
       'board_positions': positions,
       'dice_roll': roll,
       'consecutive_doubles': 0,
+      'rent_modifiers': jailEscapeRentModifiers,
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('room_id', roomId);
 
-    await _resolveSquareLanding(roomId, playerId, newPos, state, config);
     await _writeLog(roomId, playerId, state['turn_number'] as int,
         'roll_dice', {'roll': roll, 'escaped_jail': true, 'new_position': newPos});
+    await _resolveSquareLanding(roomId, playerId, newPos, state, config);
     return okJson({'roll': roll, 'escaped_jail': true, 'new_position': newPos});
   }
 
@@ -834,11 +1038,17 @@ Future<Response> _rollDiceInJail(
     final newPos = (currentPos + total) % Board.boardSize;
     positions[playerId] = newPos;
 
+    final forcedMoveRentModifiers = _decrementRollProtections(
+      Map<String, dynamic>.from(state['rent_modifiers'] as Map<String, dynamic>? ?? {}),
+      playerId,
+    );
+
     final updates = <String, dynamic>{
       'jail_status': jailStatus,
       'balances': balances,
       'board_positions': positions,
       'dice_roll': roll,
+      'rent_modifiers': forcedMoveRentModifiers,
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (config['free_parking_jackpot'] as bool? ?? false) {
@@ -849,9 +1059,9 @@ Future<Response> _rollDiceInJail(
     final stateForLanding = Map<String, dynamic>.from(state)
         ..['balances'] = balances;
     await supabase.from('game_state').update(updates).eq('room_id', roomId);
-    await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
     await _writeLog(roomId, playerId, state['turn_number'] as int,
         'roll_dice', {'roll': roll, 'forced_fine': fine, 'new_position': newPos});
+    await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
     return okJson({'roll': roll, 'forced_fine': fine, 'new_position': newPos});
   }
 
@@ -877,13 +1087,24 @@ Future<void> _resolveSquareLanding(
   String playerId,
   int squareIndex,
   Map<String, dynamic> state,
-  Map<String, dynamic> config,
-) async {
+  Map<String, dynamic> config, {
+  double rentMultiplier = 1.0,
+  int depth = 0,
+}) async {
   final square = Board.squares[squareIndex];
   final ownership = state['property_ownership'] as Map<String, dynamic>;
   final ownerId = ownership['$squareIndex'] as String?;
   final mortgaged = (state['mortgaged'] as List<dynamic>).contains(squareIndex);
   final now = DateTime.now().toIso8601String();
+
+  if (depth > 1) {
+    await supabase.from('game_state').update({
+      'phase': 'trade',
+      'pending_action': null,
+      'updated_at': now,
+    }).eq('room_id', roomId);
+    return;
+  }
 
   switch (square.type) {
     case SquareType.property:
@@ -897,33 +1118,52 @@ Future<void> _resolveSquareLanding(
           'updated_at': now,
         }).eq('room_id', roomId);
       } else if (ownerId != playerId && !mortgaged) {
-        final rent = _calculateRent(square, squareIndex, ownerId!, state);
-        final balances = Map<String, dynamic>.from(
-            state['balances'] as Map<String, dynamic>);
-        final playerBalance = (balances[playerId] as int?) ?? 0;
-        balances[playerId] = playerBalance - rent;
-        balances[ownerId] = ((balances[ownerId] as int?) ?? 0) + rent;
+        final rentModifiers = Map<String, dynamic>.from(
+            state['rent_modifiers'] as Map<String, dynamic>? ?? {});
+        final immune = _hasRentImmunity(rentModifiers, playerId, ownerId);
 
-        if (playerBalance < rent) {
-          // Insufficient funds: freeze in bankruptcyNegotiation
+        if (immune) {
           await supabase.from('game_state').update({
-            'balances': balances,
-            'pending_action': {
-              'type': 'rent_payment',
-              'square': squareIndex,
-              'owner_id': ownerId,
-              'amount': rent,
-            },
-            'phase': 'bankruptcyNegotiation',
-            'updated_at': now,
-          }).eq('room_id', roomId);
-        } else {
-          await supabase.from('game_state').update({
-            'balances': balances,
             'pending_action': null,
             'phase': 'trade',
             'updated_at': now,
           }).eq('room_id', roomId);
+          await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_immunity',
+              {'square': squareIndex, 'owner_id': ownerId});
+        } else {
+          final rent = (_calculateRent(square, squareIndex, ownerId, state) * rentMultiplier).round();
+          final balances = Map<String, dynamic>.from(
+              state['balances'] as Map<String, dynamic>);
+          final playerBalance = (balances[playerId] as int?) ?? 0;
+          final actualPayment = playerBalance < rent ? playerBalance : rent;
+          balances[playerId] = playerBalance - rent; // goes negative if insufficient
+          balances[ownerId] = ((balances[ownerId] as int?) ?? 0) + actualPayment;
+
+          if (playerBalance < rent) {
+            // Insufficient funds: freeze in bankruptcyNegotiation
+            await supabase.from('game_state').update({
+              'balances': balances,
+              'pending_action': {
+                'type': 'rent_payment',
+                'square': squareIndex,
+                'owner_id': ownerId,
+                'amount': rent,
+              },
+              'phase': 'bankruptcyNegotiation',
+              'updated_at': now,
+            }).eq('room_id', roomId);
+            await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_payment',
+                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent});
+          } else {
+            await supabase.from('game_state').update({
+              'balances': balances,
+              'pending_action': null,
+              'phase': 'trade',
+              'updated_at': now,
+            }).eq('room_id', roomId);
+            await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_payment',
+                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent});
+          }
         }
       } else {
         // Own property or mortgaged: no action
@@ -935,48 +1175,62 @@ Future<void> _resolveSquareLanding(
       }
 
     case SquareType.communityChest:
+    case SquareType.chance:
       final result = await drawAndApply(
-        deckType: 'community_chest',
+        deckType: square.type == SquareType.communityChest ? 'community_chest' : 'chance',
         roomId: roomId,
         playerId: playerId,
         state: state,
         config: config,
       );
+
+      final cardRentMultiplier =
+          (result.stateUpdates['_card_rent_multiplier'] as num?)?.toDouble() ?? 1.0;
+      final cardUpdates = Map<String, dynamic>.from(result.stateUpdates)
+        ..remove('_card_rent_multiplier');
+
+      // Check if card caused a negative balance → bankruptcy
+      final cardBalances = cardUpdates['balances'] as Map<String, dynamic>?;
+      final cardPlayerBalance = (cardBalances ?? (state['balances'] as Map<String, dynamic>))[playerId] as int? ?? 0;
+      final cardCausedBankruptcy = cardPlayerBalance < 0;
+
       await supabase.from('game_state').update({
-        ...result.stateUpdates,
-        'pending_action': null,
-        'phase': result.phaseOverride ?? 'trade',
+        ...cardUpdates,
+        'pending_action': cardCausedBankruptcy
+            ? {'type': 'card_payment', 'card_id': result.card.id, 'label': result.card.label}
+            : null,
+        'phase': cardCausedBankruptcy ? 'bankruptcyNegotiation' : 'trade',
         'updated_at': now,
       }).eq('room_id', roomId);
       await _writeLog(roomId, playerId, state['turn_number'] as int,
           'draw_card', result.logPayload);
 
-    case SquareType.chance:
-      final result = await drawAndApply(
-        deckType: 'chance',
-        roomId: roomId,
-        playerId: playerId,
-        state: state,
-        config: config,
-      );
-      await supabase.from('game_state').update({
-        ...result.stateUpdates,
-        'pending_action': null,
-        'phase': result.phaseOverride ?? 'trade',
-        'updated_at': now,
-      }).eq('room_id', roomId);
-      await _writeLog(roomId, playerId, state['turn_number'] as int,
-          'draw_card', result.logPayload);
+      final newPositions = cardUpdates['board_positions'] as Map<String, dynamic>?;
+      if (!cardCausedBankruptcy && newPositions != null) {
+        final newPos = newPositions[playerId] as int?;
+        if (newPos != null && newPos != squareIndex) {
+          final mergedState = Map<String, dynamic>.from(state)..addAll(cardUpdates);
+          await _resolveSquareLanding(
+            roomId, playerId, newPos, mergedState, config,
+            rentMultiplier: cardRentMultiplier,
+            depth: depth + 1,
+          );
+        }
+      }
 
     case SquareType.tax:
       final taxAmount = square.taxAmount ?? 0;
       final balances = Map<String, dynamic>.from(
           state['balances'] as Map<String, dynamic>);
-      balances[playerId] = ((balances[playerId] as int?) ?? 0) - taxAmount;
+      final preTaxBalance = (balances[playerId] as int?) ?? 0;
+      balances[playerId] = preTaxBalance - taxAmount;
+      final canPayTax = preTaxBalance >= taxAmount;
       final taxUpdates = <String, dynamic>{
         'balances': balances,
-        'pending_action': null,
-        'phase': 'trade',
+        'pending_action': canPayTax
+            ? null
+            : {'type': 'tax_payment', 'square': squareIndex, 'amount': taxAmount},
+        'phase': canPayTax ? 'trade' : 'bankruptcyNegotiation',
         'updated_at': now,
       };
       if (config['free_parking_jackpot'] as bool? ?? false) {
@@ -984,6 +1238,8 @@ Future<void> _resolveSquareLanding(
             ((state['free_parking_pot'] as int?) ?? 0) + taxAmount;
       }
       await supabase.from('game_state').update(taxUpdates).eq('room_id', roomId);
+      await _writeLog(roomId, playerId, state['turn_number'] as int, 'tax_payment',
+          {'square': squareIndex, 'amount': taxAmount});
 
     case SquareType.freeParking:
       final jackpot = config['free_parking_jackpot'] as bool? ?? false;
@@ -1011,6 +1267,7 @@ Future<void> _resolveSquareLanding(
 
     case SquareType.goToJail:
       await _sendToJail(roomId, playerId, state);
+      await _writeLog(roomId, playerId, state['turn_number'] as int, 'go_to_jail', {});
 
     case SquareType.go:
     case SquareType.jail:

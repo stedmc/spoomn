@@ -96,10 +96,15 @@ class Board {
       _nearestOf(currentPosition, utilityIndices);
 
   static int _nearestOf(int pos, List<int> targets) {
-    return targets.reduce((a, b) {
-      final distA = (a - pos) % boardSize;
-      final distB = (b - pos) % boardSize;
-      return distA <= distB ? a : b;
-    });
+    int best = targets.first;
+    int bestDist = boardSize + 1;
+    for (final t in targets) {
+      final d = (t - pos + boardSize) % boardSize;
+      if (d > 0 && d < bestDist) {
+        bestDist = d;
+        best = t;
+      }
+    }
+    return best;
   }
 }

@@ -14,6 +14,7 @@ class TokenComponent extends CircleComponent {
   String? playerName;
   bool _positioned = false;
   int _currentSlot = 0;
+  VoidCallback? onMoveComplete;
 
   set colour(Color value) => paint.color = value;
 
@@ -38,11 +39,13 @@ class TokenComponent extends CircleComponent {
     required BoardComponent board,
     bool teleport = false,
     int slot = 0,
+    bool forward = true,
   }) {
     if (_positioned && squareIndex == currentSquare && slot == _currentSlot && !teleport) {
       return;
     }
 
+    removeWhere((c) => c is TimerComponent);
     removeAll(children.whereType<Effect>().toList());
 
     final slotOff = _slotVector(slot);
@@ -61,9 +64,16 @@ class TokenComponent extends CircleComponent {
     final boardSize = board.squareRects.length;
     final steps = <int>[];
     var sq = currentSquare;
-    while (sq != squareIndex) {
-      sq = (sq + 1) % boardSize;
-      steps.add(sq);
+    if (forward) {
+      while (sq != squareIndex) {
+        sq = (sq + 1) % boardSize;
+        steps.add(sq);
+      }
+    } else {
+      while (sq != squareIndex) {
+        sq = (sq - 1 + boardSize) % boardSize;
+        steps.add(sq);
+      }
     }
 
     final effects = <MoveEffect>[];
@@ -76,7 +86,15 @@ class TokenComponent extends CircleComponent {
       effects.add(MoveEffect.to(target, EffectController(duration: 0.12)));
     }
 
-    if (effects.isNotEmpty) add(SequenceEffect(effects));
+    if (effects.isNotEmpty) {
+      add(SequenceEffect(effects));
+      add(TimerComponent(
+        period: steps.length * 0.12 + 0.05,
+        repeat: false,
+        removeOnFinish: true,
+        onTick: () => onMoveComplete?.call(),
+      ));
+    }
     currentSquare = squareIndex;
     _currentSlot = slot;
     _positioned = true;

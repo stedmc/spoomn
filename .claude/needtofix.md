@@ -1,17 +1,13 @@
-- swap +house -house and +hotel -hotel in buy house overlay. + should be on right, - on left
-- mortgaged properties should be greyed out on the board
-- 'Assign owner' and 'Force dice' picker VALUEs are unreadable. The drop down is fine, but for the selected value, it's completely unreadable, black on black or dark gray. Fix this to make the selected VALUEs readable.
-- get rid of the debug toggle on 'start game' overlay
-- game rooms are duplicated in game list (I see 4 for one game is it 1 per player?). We should only see one for each game room.
-- in 'game is starting screen' where we see the play order, move the close button to the top right of the overlay
-- sometimes rolling the dice puts a player into 'trading mode' ("Bot 4 is trading"). It doesn't move to the right spot. Why is that?
-- Sometimes it will show 'Roll dice' button but clicking it gives "Expected phase: roll, got: trade". Why? I think this is related to above (gets stuck in trade mode)
-- A player shouldn't go into 'Trading' stage after rolling turn, it should just be 'Player x's turn' in the text hint. If they open the trading menu then the subtext can say 'Player x is trading', and similar with build menu 'Player x is building, 'Player x is mortgaging' etc.
-- Let's add an activity log, so we can look back over what's happened in the game, it should be in a collapsible overlay
-- If a player gets a double and gets another roll there shouldn't be an 'End turn' button, it should have a 'Roll again' button instead which rolls the dice
-- Build, mortgage and trade buttons should be visible to a player throughout their whole turn not just the end phase.
-- Can we add some text to the property cards for the 'x2 base if whole colour group owned'?
-- The current rent return on a given property card should be highlighted, so if it's base outline the base value, if a hotel has been built on it highlight the hotel value and so on.
-- game_screen.dart is huge and needs to be majorly refactored. It should be compartmentalised where possible and split into separate files. Keep DRY and follow best OOP coding practices. No magic strings, and good use of variables and objects etc.
-- let's allow setting of names in the lobby
-If you don't immediately know the reason why some of these bugs are happening, don't make a random fix, instead create a .md file to track it, and add debug console lines so we can get to the proper bottom of the issues.
+- can we change 'rent_immunity' in activity log to a proper user facing string, something like 'Player x has rent immunity, saved £x'
+- add an 'Exit' button to the ingame settings mode which will take a user back to home page, and settings button should be bottom left of screen not bottom left of right panel
+- we need a count of houses and hotels remaining in the build screen
+- let's make mortgaged properties more obviously mortgaged in the mortgage modal
+- let's add a 'highest value player at first bankruptcy' win condition
+- what do 'loans' mean in the game settings? I think it's intended for use in tradings to allow users to loan money to another person at a rate of interest. But why do game settings allow setting a 'loan amount' and 'interest rate'. That should be settable in the trade window
+- any non-default rules should be listed in the lobby (use a panel on the right)
+- remove the subtitle from chance and community chest on board hover for those squares
+- we need a reset to default button for each row in the game settings
+- we don't need an 'Apply settings' button, it will just apply when the game starts (but soft save after every value change)
+- 'Start game' button should be permanently visible at the bottom of the lobby
+- Room code should be permanently visible at the top of the lobby
+- Let's have a left panel in the lobby for current players in the lobby

@@ -3,12 +3,29 @@ import 'package:shelf/shelf.dart';
 import '../db/supabase_client.dart';
 import '../middleware/auth_middleware.dart';
 
+Future<void> _writeLog(String roomId, String playerId, int turnNumber, String action, Map<String, dynamic> payload) async {
+  await supabase.from('game_log').insert({
+    'room_id': roomId,
+    'player_id': playerId,
+    'turn_number': turnNumber,
+    'action': action,
+    'payload': payload,
+  });
+}
+
+Future<int> _getTurnNumber(String roomId) async {
+  final row = await supabase.from('game_state').select('turn_number').eq('room_id', roomId).single();
+  return (row['turn_number'] as int?) ?? 0;
+}
+
 Future<Response> proposeTrade(
   String roomId,
   String playerId,
   Map<String, dynamic> payload,
-  Map<String, dynamic> config,
-) async {
+  Map<String, dynamic> config, {
+  String? excludeTradeId,
+  bool writeLog = true,
+}) async {
   final participants = (payload['participants'] as List?)?.cast<String>();
   final legs = (payload['legs'] as List?)?.cast<Map<String, dynamic>>();
 
@@ -58,12 +75,17 @@ Future<Response> proposeTrade(
     }
   }
 
-  // Check no asset committed to another pending trade
-  final pendingTrades = await supabase
+  // Check no asset committed to another active pending trade.
+  // Countered trades are superseded and must not block new proposals.
+  var pendingQuery = supabase
       .from('pending_trades')
       .select()
       .eq('room_id', roomId)
-      .inFilter('status', ['pending', 'countered']);
+      .eq('status', 'pending');
+  if (excludeTradeId != null) {
+    pendingQuery = pendingQuery.neq('id', excludeTradeId);
+  }
+  final pendingTrades = await pendingQuery;
 
   for (final existing in (pendingTrades as List).cast<Map<String, dynamic>>()) {
     final existingLegs = (existing['legs'] as List).cast<Map<String, dynamic>>();
@@ -88,6 +110,11 @@ Future<Response> proposeTrade(
     'status': 'pending',
     'accepted_by': [playerId], // proposer auto-accepts their own proposal
   });
+
+  if (writeLog) {
+    await _writeLog(roomId, playerId, stateRow['turn_number'] as int, 'propose_trade',
+        {'participants': participants, 'legs': legs});
+  }
 
   return okJson({'proposed': true});
 }
@@ -129,6 +156,8 @@ Future<Response> acceptTrade(
     await supabase.from('pending_trades').update({
       'accepted_by': acceptedBy,
     }).eq('id', tradeId);
+    final partialTurnNum = await _getTurnNumber(roomId);
+    await _writeLog(roomId, playerId, partialTurnNum, 'accept_trade', {'trade_id': tradeId, 'completed': false});
     return okJson({'accepted': true, 'waiting_for': participants.length - acceptedBy.length});
   }
 
@@ -192,7 +221,7 @@ Future<Response> acceptTrade(
     final properties = (leg['properties'] as List?)?.cast<int>() ?? [];
     final money = (leg['money'] as int?) ?? 0;
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
-    final futures = leg['futures'] as List<dynamic>?;
+    final immunityTurns = (leg['rent_immunity_turns'] as int?) ?? 0;
 
     for (final prop in properties) {
       ownership['$prop'] = to;
@@ -208,17 +237,18 @@ Future<Response> acceptTrade(
       goojfCards[to] = ((goojfCards[to] as int?) ?? 0) + jailCards;
     }
 
-    // Transfer rent immunities (futures)
-    if (futures != null) {
-      for (final future in futures.cast<Map<String, dynamic>>()) {
-        final toMods = Map<String, dynamic>.from(
-            (rentModifiers[to] as Map<String, dynamic>?) ??
-                {'protections': [], 'discounts': []});
-        final protections = List<dynamic>.from(toMods['protections'] as List? ?? []);
-        protections.add(future);
-        toMods['protections'] = protections;
-        rentModifiers[to] = toMods;
-      }
+    if (immunityTurns > 0) {
+      final toMods = Map<String, dynamic>.from(
+          (rentModifiers[to] as Map<String, dynamic>?) ??
+              {'protections': [], 'discounts': []});
+      final protections = List<dynamic>.from(toMods['protections'] as List? ?? []);
+      protections.add({
+        'type': 'rent_protection',
+        'rolls': immunityTurns,
+        'from_player_id': from,
+      });
+      toMods['protections'] = protections;
+      rentModifiers[to] = toMods;
     }
   }
 
@@ -254,6 +284,8 @@ Future<Response> acceptTrade(
     'resolved_at': DateTime.now().toIso8601String(),
   }).eq('id', tradeId);
 
+  await _writeLog(roomId, playerId, stateRow['turn_number'] as int, 'accept_trade', {'trade_id': tradeId, 'completed': true});
+
   return okJson({'trade_completed': true});
 }
 
@@ -286,8 +318,12 @@ Future<Response> counterTrade(
     'resolved_at': DateTime.now().toIso8601String(),
   }).eq('id', tradeId);
 
-  // Propose counter as new trade
-  return proposeTrade(roomId, playerId, payload['counter'] as Map<String, dynamic>, config);
+  final turnNum = await _getTurnNumber(roomId);
+  await _writeLog(roomId, playerId, turnNum, 'counter_trade', {'original_trade_id': tradeId});
+
+  // Propose counter as new trade, excluding the countered trade from conflict checks
+  return proposeTrade(roomId, playerId, payload['counter'] as Map<String, dynamic>, config,
+      excludeTradeId: tradeId, writeLog: false);
 }
 
 Future<Response> rejectTrade(
@@ -311,6 +347,9 @@ Future<Response> rejectTrade(
   if ((updated as List).isEmpty) {
     return errorJson(404, 'NOT_FOUND', 'Trade not found');
   }
+
+  final turnNum = await _getTurnNumber(roomId);
+  await _writeLog(roomId, playerId, turnNum, 'reject_trade', {'trade_id': tradeId});
 
   return okJson({'rejected': true});
 }
@@ -337,6 +376,9 @@ Future<Response> cancelTrade(
   if ((updated as List).isEmpty) {
     return errorJson(403, 'FORBIDDEN', 'Only the proposer can cancel a trade');
   }
+
+  final turnNum = await _getTurnNumber(roomId);
+  await _writeLog(roomId, playerId, turnNum, 'cancel_trade', {'trade_id': tradeId});
 
   return okJson({'cancelled': true});
 }

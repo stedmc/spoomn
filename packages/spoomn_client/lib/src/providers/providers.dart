@@ -134,6 +134,28 @@ final roomConfigProvider = StreamProvider.family<Map<String, dynamic>?, String>(
       .map((rows) => rows.first as Map<String, dynamic>);
 });
 
+final pendingTradesProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
+  (ref, roomId) async* {
+    try {
+      final rows = await Supabase.instance.client
+          .from('pending_trades')
+          .select()
+          .eq('room_id', roomId)
+          .eq('status', 'pending')
+          .order('created_at', ascending: false);
+      yield (rows as List).cast<Map<String, dynamic>>();
+    } catch (_) {}
+    yield* Supabase.instance.client
+        .from('pending_trades')
+        .stream(primaryKey: ['id'])
+        .eq('room_id', roomId)
+        .map((rows) => rows
+            .where((r) => r['status'] == 'pending')
+            .cast<Map<String, dynamic>>()
+            .toList());
+  },
+);
+
 final isDebugModeProvider = Provider.family<bool, String>((ref, roomId) {
   final config = ref.watch(roomConfigProvider(roomId));
   return config.valueOrNull?['debug_mode'] as bool? ?? false;
@@ -149,7 +171,7 @@ Stream<List<Map<String, dynamic>>> gameLog(GameLogRef ref, String roomId) {
       .from('game_log')
       .stream(primaryKey: ['id'])
       .eq('room_id', roomId)
-      .order('created_at', ascending: false)
+      .order('id', ascending: false)
       .limit(50)
       .map((rows) => rows.cast<Map<String, dynamic>>());
 }

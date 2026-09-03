@@ -60,7 +60,7 @@ Future<CardDrawResult> drawAndApply({
     card: card,
     stateUpdates: {...stateUpdates, ...effectUpdates.stateUpdates},
     phaseOverride: effectUpdates.phaseOverride,
-    logPayload: {'card_id': card.id, 'label': card.label, 'deck': deckType},
+    logPayload: {'card_id': card.id, 'label': card.label, 'deck': deckType, 'effect': card.effect},
   );
 }
 
@@ -134,7 +134,7 @@ _EffectResult _effectMoveRelative(
   int goSalary,
 ) {
   final squares = effect['squares'] as int;
-  final newPos = (currentPos + squares) % Board.boardSize;
+  final newPos = ((currentPos + squares) % Board.boardSize + Board.boardSize) % Board.boardSize;
   // Negative movement never passes Go
   final passedGo = squares > 0 && newPos < currentPos;
   positions[playerId] = newPos;
@@ -165,18 +165,12 @@ _EffectResult _effectMoveToNearest(
   if (passedGo) {
     balances[playerId] = ((balances[playerId] as int?) ?? 0) + goSalary;
   }
-  // rent_multiplier stored as pending_action so landing handler can apply it
   return _EffectResult(
     stateUpdates: {
       'board_positions': positions,
       'balances': balances,
-      'pending_action': {
-        'type': 'card_move_landing',
-        'square': target,
-        'rent_multiplier': effect['rent_multiplier'],
-      },
+      '_card_rent_multiplier': effect['rent_multiplier'],
     },
-    phaseOverride: 'action',
   );
 }
 

@@ -2,6 +2,8 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
+import '../spoomn_game.dart';
+
 class BoardComponent extends PositionComponent with HasGameRef {
   late List<Rect> squareRects;
   Map<int, Color> highlightedSquares = {};
@@ -9,6 +11,8 @@ class BoardComponent extends PositionComponent with HasGameRef {
   Map<int, int> squareHouseCounts = {};
   Set<int> squareHotels = {};
   Set<int> mortgagedSquares = {};
+  int freeParkingPot = 0;
+  bool freeParkingJackpotEnabled = false;
 
   static const int _sidesSquares = 9;
   static const int _totalPerSide = 11;
@@ -31,6 +35,7 @@ class BoardComponent extends PositionComponent with HasGameRef {
     for (var i = 0; i < Board.boardSize; i++) {
       _drawSquare(canvas, i, squareRects[i], Board.squares[i]);
     }
+    _drawCardPiles(canvas);
   }
 
   int? squareAtLocalPosition(Offset local) {
@@ -171,7 +176,8 @@ class BoardComponent extends PositionComponent with HasGameRef {
   void _drawLabel(Canvas canvas, int index, Rect rect, BoardSquare square) {
     final isCorner = index == 0 || index == 10 || index == 20 || index == 30;
     final isVertical = rect.height > rect.width * 1.4;
-    final fontSize = isCorner ? 7.0 : 5.0;
+    final baseFontSize = (gameRef as SpoomnGame).boardFontSize;
+    final fontSize = isCorner ? baseFontSize * 1.4 : baseFontSize;
 
     final tp = TextPainter(
       text: TextSpan(
@@ -204,6 +210,99 @@ class BoardComponent extends PositionComponent with HasGameRef {
     }
 
     canvas.restore();
+
+    if (index == 20 && freeParkingJackpotEnabled && freeParkingPot > 0) {
+      final potTp = TextPainter(
+        text: TextSpan(
+          text: '£$freeParkingPot',
+          style: TextStyle(
+            color: const Color(0xFFDAA520),
+            fontSize: fontSize * 1.1,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: rect.width - 4);
+      canvas.save();
+      canvas.clipRect(rect);
+      potTp.paint(
+        canvas,
+        Offset(rect.center.dx - potTp.width / 2, rect.center.dy + 4),
+      );
+      canvas.restore();
+    }
+  }
+
+  void _drawCardPiles(Canvas canvas) {
+    final cx = size.x / 2;
+    final cy = size.y / 2;
+    final cardW = size.x * 0.08;
+    final cardH = cardW * 1.45;
+    const depth = 2.5;
+    const layers = 4;
+
+    void drawPile(Offset center, Color faceColor, Color labelColor, String label) {
+      // Shadow layers (bottom to top)
+      for (var d = layers; d > 0; d--) {
+        final offset = Offset(center.dx + d * depth, center.dy + d * depth);
+        final rect = Rect.fromCenter(center: offset, width: cardW, height: cardH);
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+          Paint()..color = const Color(0xFFBBBBBB),
+        );
+      }
+      // Face card
+      final faceRect = Rect.fromCenter(center: center, width: cardW, height: cardH);
+      final faceRRect = RRect.fromRectAndRadius(faceRect, const Radius.circular(2));
+      canvas.drawRRect(faceRRect, Paint()..color = faceColor);
+      canvas.drawRRect(
+        faceRRect,
+        Paint()
+          ..color = labelColor.withValues(alpha: 0.7)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1,
+      );
+      // Inner border
+      final innerRect = faceRect.deflate(cardW * 0.1);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(innerRect, const Radius.circular(1)),
+        Paint()
+          ..color = labelColor.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 0.8,
+      );
+      // Label text
+      final tp = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: labelColor,
+            fontSize: cardW * 0.18,
+            fontWeight: FontWeight.bold,
+            height: 1.2,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      )..layout(maxWidth: cardW - 4);
+      tp.paint(canvas, Offset(center.dx - tp.width / 2, center.dy - tp.height / 2));
+    }
+
+    // Community Chest: upper-left quadrant of center
+    drawPile(
+      Offset(cx - size.x * 0.17, cy - size.y * 0.12),
+      const Color(0xFFFFF9E6),
+      const Color(0xFFC87800),
+      'COMMUNITY\nCHEST',
+    );
+    // Chance: upper-right quadrant of center
+    drawPile(
+      Offset(cx + size.x * 0.17, cy - size.y * 0.12),
+      const Color(0xFFFFECEC),
+      const Color(0xFFCC2200),
+      'CHANCE',
+    );
   }
 
   Color _groupColour(String group) => switch (group) {

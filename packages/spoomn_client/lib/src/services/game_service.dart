@@ -81,13 +81,16 @@ class GameService {
   Future<Map<String, dynamic>> debugAddPlayer(String roomId) =>
       _post('/api/rooms/$roomId/debug-add-player', {});
 
-  Future<void> setDebugMode(String roomId, {required bool enabled}) async {
+  Future<void> removePlayer(String roomId, String targetPlayerId) =>
+      _post('/api/rooms/$roomId/remove-player', {'player_id': targetPlayerId});
+
+  Future<void> updateConfig(String roomId, Map<String, dynamic> updates) async {
     final jwt = Supabase.instance.client.auth.currentSession?.accessToken;
     if (jwt == null) throw StateError('No active session');
     final response = await http.post(
       Uri.parse('$_baseUrl/api/rooms/$roomId/config'),
       headers: {'Authorization': 'Bearer $jwt', 'Content-Type': 'application/json'},
-      body: jsonEncode({'debug_mode': enabled}),
+      body: jsonEncode(updates),
     );
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200) {
@@ -99,6 +102,9 @@ class GameService {
       );
     }
   }
+
+  Future<void> setDebugMode(String roomId, {required bool enabled}) =>
+      updateConfig(roomId, {'debug_mode': enabled});
 
   Future<void> connect(String roomId) => _post('/api/rooms/$roomId/connect', {});
 

@@ -24,9 +24,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Future<void> _loadGames() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
     final data = await Supabase.instance.client
         .from('room_players')
         .select('room_id, game_rooms!inner(*)')
+        .eq('player_id', userId)
         .isFilter('left_at', null)
         .inFilter('game_rooms.status', ['lobby', 'active', 'paused']);
 
@@ -38,32 +40,39 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final isLargeScreen = screenW >= 600;
+
+    Widget listView = ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        ..._games.map((g) => _GameCard(game: g)),
+        const SizedBox(height: 24),
+        FilledButton(
+          onPressed: _creatingRoom ? null : _createRoom,
+          child: _creatingRoom
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('New Game'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton(
+          onPressed: _joinWithCode,
+          child: const Text('Join with Code'),
+        ),
+      ],
+    );
+
+    if (isLargeScreen) {
+      listView = Center(child: SizedBox(width: screenW * 0.6, child: listView));
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Spoomn')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                ..._games.map((g) => _GameCard(game: g)),
-                const SizedBox(height: 24),
-                FilledButton(
-                  onPressed: _creatingRoom ? null : _createRoom,
-                  child: _creatingRoom
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('New Game'),
-                ),
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: _joinWithCode,
-                  child: const Text('Join with Code'),
-                ),
-              ],
-            ),
+      body: _loading ? const Center(child: CircularProgressIndicator()) : listView,
     );
   }
 
@@ -75,7 +84,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       final result = await service.createRoom(maxPlayers: 8, playMode: 'realtime');
       if (!mounted) return;
       final roomId = (result['room'] as Map<String, dynamic>)['id'] as String;
-      context.go('/lobby/$roomId');
+      final isDebug = GoRouterState.of(context).uri.queryParameters['gamemode'] == 'debug';
+      context.go('/lobby/$roomId${isDebug ? '?gamemode=debug' : ''}');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -96,7 +106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           controller: controller,
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(hintText: 'Room code (e.g. K7X2MQ)'),
+          decoration: const InputDecoration(hintText: 'Room code (e.g. K7X2MQR9)'),
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim().toUpperCase()),
         ),
         actions: [

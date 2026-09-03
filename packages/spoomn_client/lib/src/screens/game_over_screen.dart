@@ -26,7 +26,13 @@ class GameOverScreen extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text('Game Over', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold)),
+            Text(
+              rankings.isNotEmpty && !rankings.first.isBankrupt
+                  ? '${rankings.first.displayName ?? 'Someone'} wins!'
+                  : 'Game Over',
+              style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 32),
             ...rankings.asMap().entries.map((e) {
               final pos = e.key + 1;

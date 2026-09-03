@@ -19,6 +19,7 @@ dependencies:
   freezed_annotation: ^2.4.1
   json_annotation: ^4.9.0
   http: ^1.2.1
+  shared_preferences: ^2.2.3
   spoomn_core:
     path: ../spoomn_core
 

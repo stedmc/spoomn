@@ -21,6 +21,7 @@ final router = GoRouter(
       path: '/lobby/:roomId',
       builder: (context, state) => LobbyScreen(
         roomId: state.pathParameters['roomId']!,
+        showDebugMode: state.uri.queryParameters['gamemode'] == 'debug',
       ),
     ),
     GoRoute(

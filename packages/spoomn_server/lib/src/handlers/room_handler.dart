@@ -289,10 +289,10 @@ List<Map<String, dynamic>> _assignSeatOrder(
   String method,
 ) {
   return switch (method) {
-    'random' => (players..shuffle(Random.secure())),
+    'random' => (List<Map<String, dynamic>>.from(players)..shuffle(Random.secure())),
     // host_assigned and highest_roll both use join order for now
     // highest_roll TODO: implement pre-game dice roll
-    _ => players,
+    _ => List<Map<String, dynamic>>.from(players),
   };
 }
 
@@ -418,6 +418,56 @@ Future<Response> debugAddPlayer(Request request, String playerId) async {
   return okJson({'added': true, 'player_id': botId, 'display_name': displayName});
 }
 
+Future<Response> removePlayer(Request request, String playerId) async {
+  final roomId = params(request, 'roomId')!;
+  final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  final targetPlayerId = body['player_id'] as String?;
+
+  if (targetPlayerId == null) {
+    return errorJson(400, 'MISSING_FIELD', 'player_id required');
+  }
+
+  final room = await supabase
+      .from('game_rooms')
+      .select('host_id, status, player_count')
+      .eq('id', roomId)
+      .maybeSingle();
+
+  if (room == null) return errorJson(404, 'NOT_FOUND', 'Room not found');
+  if (room['status'] != 'lobby') {
+    return errorJson(400, 'NOT_IN_LOBBY', 'Can only remove players in lobby');
+  }
+
+  // Host can remove anyone (except themselves); players can only remove themselves
+  final isHost = room['host_id'] == playerId;
+  if (!isHost && targetPlayerId != playerId) {
+    return errorJson(403, 'FORBIDDEN', 'Only the host can remove other players');
+  }
+  if (isHost && targetPlayerId == playerId) {
+    return errorJson(400, 'RULE_VIOLATION', 'Host cannot remove themselves');
+  }
+
+  final updated = await supabase
+      .from('room_players')
+      .update({'left_at': DateTime.now().toIso8601String()})
+      .eq('room_id', roomId)
+      .eq('player_id', targetPlayerId)
+      .isFilter('left_at', null)
+      .select();
+
+  if ((updated as List).isEmpty) {
+    return errorJson(404, 'NOT_FOUND', 'Player not found in this room');
+  }
+
+  final newCount = (room['player_count'] as int) - 1;
+  await supabase
+      .from('game_rooms')
+      .update({'player_count': newCount.clamp(0, 999)})
+      .eq('id', roomId);
+
+  return okJson({'removed': true, 'player_id': targetPlayerId});
+}
+
 Future<Response> updateRoomConfig(Request request, String playerId) async {
   final roomId = params(request, 'roomId')!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
@@ -436,7 +486,27 @@ Future<Response> updateRoomConfig(Request request, String playerId) async {
     return errorJson(400, 'NOT_IN_LOBBY', 'Config can only be changed before the game starts');
   }
 
-  const allowedFields = {'debug_mode'};
+  const allowedFields = {
+    'debug_mode',
+    'starting_money', 'bank_unlimited', 'bank_starting_amount', 'house_limit', 'hotel_limit', 'turn_order_method',
+    'dice_count', 'dice_sides', 'doubles_enabled', 'doubles_extra_turn', 'jail_on_consecutive_doubles',
+    'go_salary', 'go_landing_bonus',
+    'auto_claim_rent',
+    'income_tax_type', 'income_tax_amount', 'income_tax_percentage', 'super_tax_amount',
+    'free_parking_jackpot', 'free_parking_starting_amount',
+    'max_turn_time_secs',
+    'jail_fine', 'jail_turns', 'jail_doubles_escape', 'collect_go_while_in_jail',
+    'jailbreak_enabled', 'jailbreak_mandatory_turns', 'jailbreak_fine_multiplier', 'police_check_mode', 'police_duration',
+    'must_build_evenly', 'hotel_requires_four_houses', 'houses_returned_on_hotel', 'build_own_turn_only', 'sell_building_rate',
+    'mortgage_rate', 'unmortgage_interest_rate', 'trade_mortgaged_properties', 'mortgage_transfer_penalty',
+    'auction_on_decline', 'auction_style', 'auction_starting_bid', 'auction_min_raise', 'auction_time_per_bid_secs',
+    'auction_blind_time_secs', 'auction_min_bid', 'dutch_start_price', 'dutch_decrement', 'dutch_interval_secs', 'dutch_floor_price',
+    'trade_any_turn', 'multi_party_trades', 'trade_futures', 'trade_timeout_secs',
+    'winning_condition', 'net_worth_target', 'net_worth_check', 'turn_limit', 'time_limit_mins',
+    'bankruptcy_assets_to', 'allow_bankruptcy_negotiation', 'negotiation_timeout_secs', 'repayment_interest_rate',
+    'loans_enabled', 'loan_amount', 'loan_interest_rate', 'max_loans_per_player',
+    'async_turn_timeout_hours', 'async_turn_reminder_hours',
+  };
   final updates = {
     for (final e in body.entries)
       if (allowedFields.contains(e.key)) e.key: e.value,

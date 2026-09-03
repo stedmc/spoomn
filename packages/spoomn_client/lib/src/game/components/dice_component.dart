@@ -9,6 +9,8 @@ class DiceComponent extends PositionComponent {
   bool _rolling = false;
   List<int>? _lastShown;
 
+  VoidCallback? onAnimationComplete;
+
   static const double _dieSize = 40;
   static const double _gap = 8;
 
@@ -36,6 +38,7 @@ class DiceComponent extends PositionComponent {
             _values = values;
             _rolling = false;
             removeWhere((c) => c is TimerComponent);
+            onAnimationComplete?.call();
           }
         },
       ),

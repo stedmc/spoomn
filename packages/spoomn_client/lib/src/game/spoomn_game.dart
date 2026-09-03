@@ -19,10 +19,51 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   late BoardComponent board;
   late DiceComponent dice;
 
+  // Pending flags handle the race where a Supabase state update arrives and
+  // triggers an animation BEFORE the game_log entry fires _beginRollSequence
+  // and registers the completion callbacks. If a callback is null when the
+  // animation fires, the flag is set so the callback fires as soon as it is
+  // registered (which happens synchronously in _beginRollSequence).
+  bool _pendingDiceComplete = false;
+  bool _pendingTokenComplete = false;
+
+  VoidCallback? _onDiceAnimationComplete;
+  VoidCallback? get onDiceAnimationComplete => _onDiceAnimationComplete;
+  set onDiceAnimationComplete(VoidCallback? cb) {
+    _onDiceAnimationComplete = cb;
+    if (cb != null && _pendingDiceComplete) {
+      _pendingDiceComplete = false;
+      cb();
+    }
+  }
+
+  VoidCallback? _onTokenAnimationComplete;
+  VoidCallback? get onTokenAnimationComplete => _onTokenAnimationComplete;
+  set onTokenAnimationComplete(VoidCallback? cb) {
+    _onTokenAnimationComplete = cb;
+    if (cb != null && _pendingTokenComplete) {
+      _pendingTokenComplete = false;
+      cb();
+    }
+  }
+
   final ValueNotifier<int?> hoveredSquare = ValueNotifier(null);
   final ValueNotifier<int?> tappedSquare = ValueNotifier(null);
+  final ValueNotifier<Offset?> squareTapAnchor = ValueNotifier(null);
   final ValueNotifier<String?> hoveredPlayerIdNotifier = ValueNotifier(null);
   final ValueNotifier<Map<String, Color>> playerColoursNotifier = ValueNotifier({});
+
+  double boardFontSize = 12.0;
+  bool freeParkingJackpotEnabled = false;
+
+  void setBoardFontSize(double size) {
+    boardFontSize = size;
+  }
+
+  void setFreeParkingJackpot(bool enabled) {
+    freeParkingJackpotEnabled = enabled;
+    if (board.isMounted) board.freeParkingJackpotEnabled = enabled;
+  }
 
   final Map<String, TokenComponent> _tokens = {};
   final Map<String, PolicePawnComponent> _policePawns = {};
@@ -64,6 +105,13 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
     await add(board);
 
     dice = DiceComponent()..position = Vector2(size.x * 0.5, size.y * 0.5);
+    dice.onAnimationComplete = () {
+      if (_onDiceAnimationComplete != null) {
+        _onDiceAnimationComplete!();
+      } else {
+        _pendingDiceComplete = true;
+      }
+    };
     await add(dice);
   }
 
@@ -72,7 +120,16 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
     if (!board.isMounted) return;
     final local = (event.localPosition - board.position).toOffset();
     final sq = board.squareAtLocalPosition(local);
-    tappedSquare.value = (sq == tappedSquare.value) ? null : sq;
+    if (sq == tappedSquare.value) {
+      tappedSquare.value = null;
+      squareTapAnchor.value = null;
+    } else if (sq != null) {
+      tappedSquare.value = sq;
+      squareTapAnchor.value = event.localPosition.toOffset();
+    } else {
+      tappedSquare.value = null;
+      squareTapAnchor.value = null;
+    }
   }
 
   @override
@@ -81,6 +138,9 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
     final mousePos = info.eventPosition.widget;
     final local = (mousePos - board.position).toOffset();
     hoveredSquare.value = board.squareAtLocalPosition(local);
+    if (tappedSquare.value == null) {
+      squareTapAnchor.value = hoveredSquare.value != null ? mousePos.toOffset() : null;
+    }
 
     String? hovered;
     for (final entry in _tokens.entries) {
@@ -144,7 +204,11 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
     _updateHighlights();
     _updateOwnershipColours();
     _updateHousesOnBoard(state.houses, state.hotels);
-    if (board.isMounted) board.mortgagedSquares = state.mortgaged.toSet();
+    if (board.isMounted) {
+      board.mortgagedSquares = state.mortgaged.toSet();
+      board.freeParkingPot = state.freeParkingPot;
+      board.freeParkingJackpotEnabled = freeParkingJackpotEnabled;
+    }
 
     for (final e in state.jailStatus.entries) {
       _prevInJail[e.key] = e.value.inJail;
@@ -161,6 +225,14 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
       for (final e in hotels.entries)
         if (int.tryParse(e.key) != null && (e.value == true)) int.parse(e.key),
     };
+  }
+
+  void _onAnyTokenMoveComplete() {
+    if (_onTokenAnimationComplete != null) {
+      _onTokenAnimationComplete!();
+    } else {
+      _pendingTokenComplete = true;
+    }
   }
 
   void onTrapsUpdate(List<ActiveTrap> traps) {
@@ -200,11 +272,21 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
           colour: _colourForPlayer(playerId),
         );
         token.playerName = _playerNames[playerId];
+        token.onMoveComplete = _onAnyTokenMoveComplete;
         _tokens[playerId] = token;
         add(token);
       }
 
-      _tokens[playerId]!.moveTo(squareIndex, board: board, teleport: teleport, slot: slot);
+      final prevSquare = _tokens[playerId]!.currentSquare;
+      final fwdSteps = (squareIndex - prevSquare + Board.boardSize) % Board.boardSize;
+      final bwdSteps = (prevSquare - squareIndex + Board.boardSize) % Board.boardSize;
+      // "Advance to Go" (square 0) must always animate clockwise regardless of
+      // which side of the board the token is on; bwdSteps would be shorter from
+      // squares 1-19 but going backward to Go is never the correct direction.
+      final forward = teleport ||
+          (squareIndex == 0 && prevSquare != 0) ||
+          fwdSteps <= bwdSteps;
+      _tokens[playerId]!.moveTo(squareIndex, board: board, teleport: teleport, slot: slot, forward: forward);
     }
 
     // Notify colour changes if palette was used
