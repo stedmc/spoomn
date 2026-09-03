@@ -1,7 +1,6 @@
 # Dart / Flutter
 .dart_tool/
 .packages
-pubspec.lock
 build/
 *.g.dart
 *.freezed.dart
