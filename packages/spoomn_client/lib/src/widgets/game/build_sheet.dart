@@ -19,10 +19,10 @@ class GameBuildSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
+    final state = ref.watch(gameStateProvider(roomId)).value;
     if (state == null) return const SizedBox.shrink();
 
-    final config = ref.watch(roomConfigProvider(roomId)).valueOrNull;
+    final config = ref.watch(roomConfigProvider(roomId)).value;
     final houseLimit = (config?['house_limit'] as int?) ?? 32;
     final hotelLimit = (config?['hotel_limit'] as int?) ?? 12;
 

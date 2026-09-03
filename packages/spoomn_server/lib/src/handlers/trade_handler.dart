@@ -1,4 +1,5 @@
 import 'package:shelf/shelf.dart';
+import 'package:spoomn_core/spoomn_core.dart';
 
 import '../db/supabase_client.dart';
 import '../middleware/auth_middleware.dart';
@@ -60,18 +61,18 @@ Future<Response> proposeTrade(
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
 
     for (final prop in properties) {
+      if (prop < 0 || prop >= Board.boardSize) {
+        return errorJson(400, 'INVALID_PROPERTY', 'Property index out of range');
+      }
       if (ownership['$prop'] != from) {
-        return errorJson(400, 'NOT_OWNER',
-            'Player $from does not own property $prop',);
+        return errorJson(400, 'NOT_OWNER', 'Player does not own the requested property');
       }
     }
     if (money > 0 && ((balances[from] as int?) ?? 0) < money) {
-      return errorJson(400, 'INSUFFICIENT_FUNDS',
-          'Player $from cannot afford £$money in this trade',);
+      return errorJson(400, 'INSUFFICIENT_FUNDS', 'Insufficient funds for this trade');
     }
     if (jailCards > 0 && ((goojfCards[from] as int?) ?? 0) < jailCards) {
-      return errorJson(400, 'RULE_VIOLATION',
-          'Player $from does not have $jailCards GOOJF card(s)',);
+      return errorJson(400, 'RULE_VIOLATION', 'Insufficient GOOJF cards for this trade');
     }
   }
 
@@ -187,13 +188,19 @@ Future<Response> acceptTrade(
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
 
     for (final prop in properties) {
+      if (prop < 0 || prop >= Board.boardSize) {
+        await supabase.from('pending_trades').update({
+          'status': 'cancelled',
+          'resolved_at': DateTime.now().toIso8601String(),
+        }).eq('id', tradeId);
+        return errorJson(400, 'INVALID_PROPERTY', 'Property index out of range — trade cancelled');
+      }
       if (ownership['$prop'] != from) {
         await supabase.from('pending_trades').update({
           'status': 'cancelled',
           'resolved_at': DateTime.now().toIso8601String(),
         }).eq('id', tradeId);
-        return errorJson(400, 'ASSET_INVALID',
-            'Property $prop is no longer owned by $from — trade cancelled',);
+        return errorJson(400, 'ASSET_INVALID', 'A property is no longer owned by the expected player — trade cancelled');
       }
     }
     if (money > 0 && ((balances[from] as int?) ?? 0) < money) {

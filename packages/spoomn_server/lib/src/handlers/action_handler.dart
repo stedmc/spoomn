@@ -48,11 +48,23 @@ Future<Response> handleAction(Request request, String playerId) async {
       .eq('room_id', roomId)
       .single();
 
-  // Debug mode: allow any authenticated room member to act as the current player
+  // Debug mode: allow any authenticated room member to act as another player,
+  // but only if that player is actually in the room.
   final debugMode = configRow['debug_mode'] as bool? ?? false;
-  final effectivePlayerId = debugMode && payload.containsKey('debug_as')
-      ? payload['debug_as'] as String
-      : playerId;
+  String effectivePlayerId = playerId;
+  if (debugMode && payload.containsKey('debug_as')) {
+    final debugAs = payload['debug_as'] as String?;
+    if (debugAs != null) {
+      final member = await supabase
+          .from('room_players')
+          .select('player_id')
+          .eq('room_id', roomId)
+          .eq('player_id', debugAs)
+          .isFilter('left_at', null)
+          .maybeSingle();
+      if (member != null) effectivePlayerId = debugAs;
+    }
+  }
 
   // Dispatch
   return switch (action) {

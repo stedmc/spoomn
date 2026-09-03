@@ -34,19 +34,19 @@ class _GameSidePanelState extends ConsumerState<GameSidePanel> {
     final isDebug = ref.watch(isDebugModeProvider(widget.roomId));
     final isMyTurn = ref.watch(isMyTurnProvider(widget.roomId));
     final myId = ref.watch(currentUserIdProvider);
-    final room = ref.watch(gameRoomProvider(widget.roomId)).valueOrNull;
-    final players = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final room = ref.watch(gameRoomProvider(widget.roomId)).value;
+    final players = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
     final stateAsync = ref.watch(gameStateProvider(widget.roomId));
     // Show Roll Dice immediately while state is loading — server validates phase on every action.
-    final phase = stateAsync.valueOrNull?.phase.name ?? (stateAsync.isLoading ? GamePhaseName.roll : null);
-    final auctionBidder = stateAsync.valueOrNull?.activeAuction?['current_bidder'] as String?;
+    final phase = stateAsync.value?.phase.name ?? (stateAsync.isLoading ? GamePhaseName.roll : null);
+    final auctionBidder = stateAsync.value?.activeAuction?['current_bidder'] as String?;
     final isMyAuctionTurn = phase == GamePhaseName.auction && auctionBidder == myId;
 
     // Auto-follow current player when the turn advances; hold off during auction
     // since auction has its own bidder-tracking listener below.
     ref.listen(gameRoomProvider(widget.roomId), (_, next) {
       next.whenData((r) {
-        final currentPhase = ref.read(gameStateProvider(widget.roomId)).valueOrNull?.phase;
+        final currentPhase = ref.read(gameStateProvider(widget.roomId)).value?.phase;
         if (_actingAs != null &&
             _actingAs != r.currentPlayerId &&
             currentPhase != GamePhase.auction) {
@@ -58,9 +58,9 @@ class _GameSidePanelState extends ConsumerState<GameSidePanel> {
     // In debug mode, auto-switch actingAs to the current auction bidder so bots
     // can be driven by the host without touching the dropdown.
     ref.listen(gameStateProvider(widget.roomId), (prev, next) {
-      final state = next.valueOrNull;
+      final state = next.value;
       if (state == null) return;
-      final prevState = prev?.valueOrNull;
+      final prevState = prev?.value;
       if (state.phase == GamePhase.auction && ref.read(isDebugModeProvider(widget.roomId))) {
         final bidder = state.activeAuction?['current_bidder'] as String?;
         if (bidder != null && _actingAs != bidder) {

@@ -101,7 +101,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
 
   void _applyCurrentPlayerColours() {
     if (!mounted) return;
-    final players = ref.read(roomPlayersProvider(widget.roomId)).valueOrNull;
+    final players = ref.read(roomPlayersProvider(widget.roomId)).value;
     if (players == null) return;
     _game.setPlayerTokenColours({
       for (final p in players) p.playerId: SpoomnGame.tokenColourToColor(p.tokenColour),
@@ -155,8 +155,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     ref.listen(gameRoomProvider(widget.roomId), (prev, next) {
       next.whenData((room) {
         if (room.status == GameRoomStatus.finished && context.mounted && !_showEndGameOverlay) {
-          final players = ref.read(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
-          final state = ref.read(gameStateProvider(widget.roomId)).valueOrNull;
+          final players = ref.read(roomPlayersProvider(widget.roomId)).value ?? [];
+          final state = ref.read(gameStateProvider(widget.roomId)).value;
           final active = players.where((p) => !p.isBankrupt).toList()
             ..sort((a, b) {
               final balA = state?.balances[a.playerId] ?? 0;
@@ -171,7 +171,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
             if (context.mounted) context.go('/game-over/${widget.roomId}');
           });
         }
-        final prevRoom = prev?.valueOrNull;
+        final prevRoom = prev?.value;
         if (room.status == GameRoomStatus.active &&
             prevRoom?.status == GameRoomStatus.starting) {
           setState(() => _showReveal = true);
@@ -221,7 +221,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
       });
     });
 
-    final room = ref.watch(gameRoomProvider(widget.roomId)).valueOrNull;
+    final room = ref.watch(gameRoomProvider(widget.roomId)).value;
     final isStarting = room?.status == GameRoomStatus.starting;
     final myId = ref.watch(currentUserIdProvider) ?? '';
 
@@ -439,7 +439,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     final action = entry['action'] as String?;
     final payload = (entry['payload'] as Map<String, dynamic>?) ?? {};
     final playerId = entry['player_id'] as String?;
-    final players = ref.read(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final players = ref.read(roomPlayersProvider(widget.roomId)).value ?? [];
     final name = players.where((p) => p.playerId == playerId).firstOrNull?.displayName ?? 'Someone';
 
     return switch (action) {
@@ -522,7 +522,7 @@ class _EndGameOverlayState extends ConsumerState<_EndGameOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final players = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final players = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
     final winner = players.where((p) => p.playerId == widget.winnerId).firstOrNull;
     final winnerName = winner?.displayName ?? 'Someone';
 

@@ -176,6 +176,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         content: TextField(
           controller: controller,
           autofocus: true,
+          maxLength: 50,
           decoration: const InputDecoration(labelText: 'Display name'),
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
         ),
@@ -348,8 +349,8 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     final configAsync = ref.watch(roomConfigProvider(widget.roomId));
 
     final draftConfig = ref.watch(draftRoomConfigProvider(widget.roomId));
-    final isHost = roomAsync.valueOrNull?.hostId == myId;
-    final streamDebugMode = configAsync.valueOrNull?['debug_mode'] as bool? ?? false;
+    final isHost = roomAsync.value?.hostId == myId;
+    final streamDebugMode = configAsync.value?['debug_mode'] as bool? ?? false;
 
     if (_pendingDebugMode != null && _pendingDebugMode == streamDebugMode) {
       Future.microtask(() => setState(() => _pendingDebugMode = null));
@@ -371,9 +372,9 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       });
     });
 
-    final room = roomAsync.valueOrNull;
-    final players = playersAsync.valueOrNull ?? [];
-    final config = configAsync.valueOrNull;
+    final room = roomAsync.value;
+    final players = playersAsync.value ?? [];
+    final config = configAsync.value;
     final screenW = MediaQuery.of(context).size.width;
     final isLargeScreen = screenW >= 720;
 

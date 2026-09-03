@@ -11,8 +11,8 @@ class TurnIndicatorWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final room = ref.watch(gameRoomProvider(roomId)).valueOrNull;
-    final players = ref.watch(roomPlayersProvider(roomId)).valueOrNull ?? [];
+    final room = ref.watch(gameRoomProvider(roomId)).value;
+    final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
     final currentId = room?.currentPlayerId;
     if (currentId == null) return const SizedBox.shrink();
 

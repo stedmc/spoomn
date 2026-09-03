@@ -66,7 +66,7 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
 
   @override
   Widget build(BuildContext context) {
-    final rawPlayers = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final rawPlayers = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
     final players = [...rawPlayers]
       ..sort((a, b) {
         final ao = a.seatOrder, bo = b.seatOrder;
@@ -75,15 +75,15 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
         if (bo == null) return -1;
         return ao.compareTo(bo);
       });
-    final state = ref.watch(gameStateProvider(widget.roomId)).valueOrNull;
-    final room = ref.watch(gameRoomProvider(widget.roomId)).valueOrNull;
+    final state = ref.watch(gameStateProvider(widget.roomId)).value;
+    final room = ref.watch(gameRoomProvider(widget.roomId)).value;
 
     ref.listen(gameStateProvider(widget.roomId), (prev, next) {
       if (prev == null) return;
       prev.whenData((prevState) {
         next.whenData((nextState) {
           final currentPlayers =
-              ref.read(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+              ref.read(roomPlayersProvider(widget.roomId)).value ?? [];
           for (final p in currentPlayers) {
             final oldBal = prevState.balances[p.playerId] ?? 0;
             final newBal = nextState.balances[p.playerId] ?? 0;

@@ -198,7 +198,7 @@ class GameActivityLog extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final logAsync = ref.watch(gameLogProvider(roomId));
-    final players = ref.watch(roomPlayersProvider(roomId)).valueOrNull ?? [];
+    final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
 
     String nameOf(String? id) => id == null
         ? 'Unknown'

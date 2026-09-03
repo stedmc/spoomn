@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/providers.dart';
@@ -99,7 +100,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final config = ref.read(roomConfigProvider(widget.roomId)).valueOrNull;
+      final config = ref.read(roomConfigProvider(widget.roomId)).value;
       if (config != null && mounted) {
         setState(() {
           _config = Map<String, dynamic>.from(config);
@@ -223,6 +224,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               enabled: enabled && widget.isHost,
               keyboardType: TextInputType.number,
               textAlign: TextAlign.end,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
               onChanged: (v) {
                 final n = int.tryParse(v);
@@ -281,6 +283,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
                 enabled: enabled && widget.isHost,
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.end,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration:
                     const InputDecoration(isDense: true, border: UnderlineInputBorder()),
                 onChanged: (v) {
@@ -385,6 +388,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               enabled: enabled && widget.isHost,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.end,
+              inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))],
               decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
               onChanged: (s) {
                 final d = double.tryParse(s);

@@ -1,12 +1,14 @@
-# fly.toml app configuration file generated for spoomn-server on 2026-09-03T22:55:39+01:00
+# fly.toml app configuration file generated for spoomn on 2026-09-03T22:57:32+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'spoomn-server'
+app = 'spoomn'
 primary_region = 'lhr'
 
 [build]
+  dockerfile = 'packages/spoomn_server/Dockerfile'
+
 [http_service]
   internal_port = 8080
   force_https = true

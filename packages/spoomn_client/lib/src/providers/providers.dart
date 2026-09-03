@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -10,7 +11,7 @@ part 'providers.g.dart';
 // ---------------------------------------------------------------------------
 
 @riverpod
-String? currentUserId(CurrentUserIdRef ref) =>
+String? currentUserId(Ref ref) =>
     Supabase.instance.client.auth.currentUser?.id;
 
 // ---------------------------------------------------------------------------
@@ -18,7 +19,7 @@ String? currentUserId(CurrentUserIdRef ref) =>
 // ---------------------------------------------------------------------------
 
 @riverpod
-Stream<GameRoom> gameRoom(GameRoomRef ref, String roomId) {
+Stream<GameRoom> gameRoom(Ref ref, String roomId) {
   return Supabase.instance.client
       .from('game_rooms')
       .stream(primaryKey: ['id'])
@@ -31,7 +32,7 @@ Stream<GameRoom> gameRoom(GameRoomRef ref, String roomId) {
 // ---------------------------------------------------------------------------
 
 @riverpod
-Stream<GameState> gameState(GameStateRef ref, String roomId) async* {
+Stream<GameState> gameState(Ref ref, String roomId) async* {
   // Eager REST fetch so data is available before the WebSocket channel is
   // confirmed — avoids the stream getting stuck when the initial query fires
   // before the realtime subscription is established.
@@ -56,7 +57,7 @@ Stream<GameState> gameState(GameStateRef ref, String roomId) async* {
 // ---------------------------------------------------------------------------
 
 @riverpod
-Stream<List<RoomPlayer>> roomPlayers(RoomPlayersRef ref, String roomId) {
+Stream<List<RoomPlayer>> roomPlayers(Ref ref, String roomId) {
   return Supabase.instance.client
       .from('room_players')
       .stream(primaryKey: ['id'])
@@ -87,15 +88,15 @@ Stream<List<RoomPlayer>> roomPlayers(RoomPlayersRef ref, String roomId) {
 }
 
 @riverpod
-RoomPlayer? myPlayer(MyPlayerRef ref, String roomId) {
-  final players = ref.watch(roomPlayersProvider(roomId)).valueOrNull ?? [];
+RoomPlayer? myPlayer(Ref ref, String roomId) {
+  final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
   final myId = ref.watch(currentUserIdProvider);
   return players.where((p) => p.playerId == myId).firstOrNull;
 }
 
 @riverpod
-bool isMyTurn(IsMyTurnRef ref, String roomId) {
-  final room = ref.watch(gameRoomProvider(roomId)).valueOrNull;
+bool isMyTurn(Ref ref, String roomId) {
+  final room = ref.watch(gameRoomProvider(roomId)).value;
   final myId = ref.watch(currentUserIdProvider);
   return room?.currentPlayerId == myId;
 }
@@ -105,7 +106,7 @@ bool isMyTurn(IsMyTurnRef ref, String roomId) {
 // ---------------------------------------------------------------------------
 
 @riverpod
-Stream<List<ActiveTrap>> activeTraps(ActiveTrapsRef ref, String roomId) {
+Stream<List<ActiveTrap>> activeTraps(Ref ref, String roomId) {
   return Supabase.instance.client
       .from('active_traps')
       .stream(primaryKey: ['id'])
@@ -162,7 +163,7 @@ final pendingTradesProvider = StreamProvider.family<List<Map<String, dynamic>>, 
 
 final isDebugModeProvider = Provider.family<bool, String>((ref, roomId) {
   final config = ref.watch(roomConfigProvider(roomId));
-  return config.valueOrNull?['debug_mode'] as bool? ?? false;
+  return config.value?['debug_mode'] as bool? ?? false;
 });
 
 // ---------------------------------------------------------------------------
@@ -170,7 +171,7 @@ final isDebugModeProvider = Provider.family<bool, String>((ref, roomId) {
 // ---------------------------------------------------------------------------
 
 @riverpod
-Stream<List<Map<String, dynamic>>> gameLog(GameLogRef ref, String roomId) {
+Stream<List<Map<String, dynamic>>> gameLog(Ref ref, String roomId) {
   return Supabase.instance.client
       .from('game_log')
       .stream(primaryKey: ['id'])

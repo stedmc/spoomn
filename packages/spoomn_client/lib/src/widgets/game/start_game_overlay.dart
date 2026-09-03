@@ -30,7 +30,7 @@ class _GameStartOverlayState extends ConsumerState<GameStartOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final room = ref.watch(gameRoomProvider(widget.roomId)).valueOrNull;
+    final room = ref.watch(gameRoomProvider(widget.roomId)).value;
     final myId = ref.watch(currentUserIdProvider);
     final isHost = room?.hostId == myId;
     final playerCount = room?.playerCount ?? 0;

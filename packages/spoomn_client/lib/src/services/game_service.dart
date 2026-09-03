@@ -7,7 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 part 'game_service.g.dart';
 
 @riverpod
-GameService gameService(GameServiceRef ref) => GameService();
+GameService gameService(Ref ref) => GameService();
 
 class GameService {
   static const String _baseUrl = String.fromEnvironment(

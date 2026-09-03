@@ -655,16 +655,16 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    final players = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
-    final state   = ref.watch(gameStateProvider(widget.roomId)).valueOrNull;
-    final config  = ref.watch(roomConfigProvider(widget.roomId)).valueOrNull;
+    final players = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
+    final state   = ref.watch(gameStateProvider(widget.roomId)).value;
+    final config  = ref.watch(roomConfigProvider(widget.roomId)).value;
     final isDebug = ref.watch(isDebugModeProvider(widget.roomId));
 
     // Live-sync the response trade data
     Map<String, dynamic>? activeTrade = widget.trade;
     if (widget.trade != null) {
       final tradeId = widget.trade!['id'] as String?;
-      final liveList = ref.watch(pendingTradesProvider(widget.roomId)).valueOrNull;
+      final liveList = ref.watch(pendingTradesProvider(widget.roomId)).value;
       final liveTrade = liveList?.where((t) => t['id'] == tradeId).firstOrNull;
 
       if (liveList != null && liveTrade == null) {

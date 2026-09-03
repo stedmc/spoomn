@@ -12,8 +12,8 @@ class PersistentCardWidget extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final myId = ref.watch(currentUserIdProvider) ?? '';
-    final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
-    final room = ref.watch(gameRoomProvider(roomId)).valueOrNull;
+    final state = ref.watch(gameStateProvider(roomId)).value;
+    final room = ref.watch(gameRoomProvider(roomId)).value;
 
     if (state == null || myId.isEmpty) return const SizedBox.shrink();
 

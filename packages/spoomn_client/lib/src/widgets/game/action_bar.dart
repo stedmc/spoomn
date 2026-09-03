@@ -54,17 +54,17 @@ class GameActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stateAsync = ref.watch(gameStateProvider(roomId));
-    final pending = stateAsync.valueOrNull?.pendingAction?['type'] as String?;
-    final config = ref.watch(roomConfigProvider(roomId)).valueOrNull;
+    final pending = stateAsync.value?.pendingAction?['type'] as String?;
+    final config = ref.watch(roomConfigProvider(roomId)).value;
     final doublesEnabled = config?['doubles_enabled'] as bool? ?? true;
     final doublesExtraTurn = config?['doubles_extra_turn'] as bool? ?? true;
-    final diceRoll = stateAsync.valueOrNull?.diceRoll;
+    final diceRoll = stateAsync.value?.diceRoll;
     final shouldRollAgain = doublesEnabled &&
         doublesExtraTurn &&
         diceRoll != null &&
         diceRoll.length >= 2 &&
         diceRoll.every((d) => d == diceRoll[0]) &&
-        (stateAsync.valueOrNull?.consecutiveDoubles ?? 0) > 0;
+        (stateAsync.value?.consecutiveDoubles ?? 0) > 0;
 
     return Container(
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
@@ -290,8 +290,8 @@ class _AuctionBarState extends ConsumerState<_AuctionBar> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(gameStateProvider(widget.roomId)).valueOrNull;
-    final players = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final state = ref.watch(gameStateProvider(widget.roomId)).value;
+    final players = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
     final auction = state?.activeAuction;
     if (auction == null) return const SizedBox.shrink();
 

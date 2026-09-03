@@ -41,7 +41,7 @@ class _GameOrderRevealOverlayState extends ConsumerState<GameOrderRevealOverlay>
 
   @override
   Widget build(BuildContext context) {
-    final rawPlayers = ref.watch(roomPlayersProvider(widget.roomId)).valueOrNull ?? [];
+    final rawPlayers = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
     final players = [...rawPlayers]
       ..sort((a, b) {
         final ao = a.seatOrder, bo = b.seatOrder;

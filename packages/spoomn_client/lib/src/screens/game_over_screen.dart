@@ -10,8 +10,8 @@ class GameOverScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final players = ref.watch(roomPlayersProvider(roomId)).valueOrNull ?? [];
-    final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
+    final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
+    final state = ref.watch(gameStateProvider(roomId)).value;
 
     final rankings = [...players]..sort((a, b) {
         if (a.isBankrupt && !b.isBankrupt) return 1;

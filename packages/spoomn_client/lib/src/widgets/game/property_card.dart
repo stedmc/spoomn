@@ -15,8 +15,8 @@ class GameSquareHoverCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
-    final players = ref.watch(roomPlayersProvider(roomId)).valueOrNull ?? [];
+    final state = ref.watch(gameStateProvider(roomId)).value;
+    final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
     final isDebug = ref.watch(isDebugModeProvider(roomId));
 
     return ListenableBuilder(

@@ -44,6 +44,10 @@ Future<Response> createRoom(Request request, String playerId) async {
 Future<Response> joinRoom(Request request, String playerId) async {
   final roomCode = request.params['roomCode']!;
 
+  if (!RegExp(r'^[A-Z2-9]{6}$').hasMatch(roomCode)) {
+    return errorJson(400, 'INVALID_ROOM_CODE', 'Invalid room code format');
+  }
+
   final room = await supabase
       .from('game_rooms')
       .select()
@@ -347,9 +351,19 @@ Future<Response> listMyGames(Request request, String playerId) async {
 
 Future<Response> updatePushToken(Request request, String playerId) async {
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
+  final token = body['token'] as String?;
+  final platform = body['platform'] as String?;
+
+  if (token != null && token.length > 200) {
+    return errorJson(400, 'INVALID_TOKEN', 'Push token too long');
+  }
+  if (platform != null && !['ios', 'android'].contains(platform)) {
+    return errorJson(400, 'INVALID_PLATFORM', 'Platform must be ios or android');
+  }
+
   await supabase.from('profiles').update({
-    'push_token': body['token'],
-    'push_platform': body['platform'],
+    'push_token': token,
+    'push_platform': platform,
   }).eq('id', playerId);
   return okJson({'updated': true});
 }

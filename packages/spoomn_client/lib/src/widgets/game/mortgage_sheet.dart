@@ -19,7 +19,7 @@ class GameMortgageSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
+    final state = ref.watch(gameStateProvider(roomId)).value;
     if (state == null) return const SizedBox.shrink();
 
     final owned = state.propertyOwnership.entries
