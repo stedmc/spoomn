@@ -15,6 +15,7 @@ import '../widgets/game/game_constants.dart';
 import '../widgets/game/game_toast.dart';
 import '../widgets/game/order_reveal_overlay.dart';
 import '../widgets/game/property_card.dart';
+import '../widgets/game/settings_sheet.dart';
 import '../widgets/game/side_panel.dart';
 import '../widgets/game/start_game_overlay.dart';
 import '../widgets/game/trade_overlay.dart';
@@ -324,6 +325,21 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
               winnerId: _endGameWinnerId,
               roomId: widget.roomId,
             ),
+          Positioned(
+            bottom: 12,
+            left: 12,
+            child: IconButton(
+              icon: const Icon(Icons.settings, size: 20),
+              tooltip: 'Settings',
+              style: IconButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                builder: (_) => const GameSettingsSheet(),
+              ),
+            ),
+          ),
         ],
       ),
     );

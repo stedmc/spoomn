@@ -10,7 +10,6 @@ import 'debug_panel.dart';
 import 'game_constants.dart';
 import 'persistent_card_widget.dart';
 import 'player_strip.dart';
-import 'settings_sheet.dart';
 import 'status_banner.dart';
 
 class GameSidePanel extends ConsumerStatefulWidget {
@@ -103,16 +102,6 @@ class _GameSidePanelState extends ConsumerState<GameSidePanel> {
           const Divider(height: 1),
           Expanded(child: GameActivityLog(roomId: widget.roomId)),
           PersistentCardWidget(roomId: widget.roomId),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              icon: const Icon(Icons.settings, size: 18),
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                builder: (_) => const GameSettingsSheet(),
-              ),
-            ),
-          ),
           if ((isDebug || (isMyTurn && phase != GamePhaseName.auction) || isMyAuctionTurn) && !widget.isAnimating) ...[
             const Divider(height: 1),
             if (phase == null)

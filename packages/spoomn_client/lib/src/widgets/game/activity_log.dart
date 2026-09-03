@@ -144,9 +144,10 @@ class GameActivityLog extends ConsumerWidget {
         items.add(desc);
       }
       if (rentTurns > 0) {
+        final turns = rentTurns == 1 ? '1 turn' : '$rentTurns turns';
         final desc = multiParty
-            ? '$rentTurns turn rent immunity (from ${nameOf(from)})'
-            : '$rentTurns turn rent immunity';
+            ? 'Rent immunity for $turns (from ${nameOf(from)})'
+            : 'Rent immunity for $turns';
         items.add(desc);
       }
     }

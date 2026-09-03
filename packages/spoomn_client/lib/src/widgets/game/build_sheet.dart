@@ -22,6 +22,17 @@ class GameBuildSheet extends ConsumerWidget {
     final state = ref.watch(gameStateProvider(roomId)).valueOrNull;
     if (state == null) return const SizedBox.shrink();
 
+    final config = ref.watch(roomConfigProvider(roomId)).valueOrNull;
+    final houseLimit = (config?['house_limit'] as int?) ?? 32;
+    final hotelLimit = (config?['hotel_limit'] as int?) ?? 12;
+
+    final totalHousesInPlay = state.houses.values
+        .fold<int>(0, (sum, v) => sum + ((v as num?)?.toInt() ?? 0));
+    final totalHotelsInPlay = state.hotels.values.where((v) => v == true).length;
+
+    final housesRemaining = houseLimit - totalHousesInPlay;
+    final hotelsRemaining = hotelLimit - totalHotelsInPlay;
+
     final owned = state.propertyOwnership.entries
         .where((e) => e.value == effectivePlayerId)
         .map((e) => int.tryParse(e.key))
@@ -34,6 +45,31 @@ class GameBuildSheet extends ConsumerWidget {
       padding: const EdgeInsets.all(16),
       children: [
         const Text('Build / Sell', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Card(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _SupplyChip(
+                  icon: Icons.house,
+                  label: 'Houses',
+                  remaining: housesRemaining,
+                  total: houseLimit,
+                ),
+                const SizedBox(width: 12),
+                _SupplyChip(
+                  icon: Icons.apartment,
+                  label: 'Hotels',
+                  remaining: hotelsRemaining,
+                  total: hotelLimit,
+                ),
+              ],
+            ),
+          ),
+        ),
         const SizedBox(height: 8),
         if (owned.isEmpty)
           const Padding(
@@ -111,6 +147,44 @@ class GameBuildSheet extends ConsumerWidget {
             ),
           );
         }),
+      ],
+    );
+  }
+}
+
+class _SupplyChip extends StatelessWidget {
+  const _SupplyChip({
+    required this.icon,
+    required this.label,
+    required this.remaining,
+    required this.total,
+  });
+
+  final IconData icon;
+  final String label;
+  final int remaining;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLow = remaining <= (total * 0.25).ceil();
+    final color = isLow ? Colors.orange : Theme.of(context).colorScheme.primary;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+            Text(
+              '$remaining / $total remaining',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color),
+            ),
+          ],
+        ),
       ],
     );
   }

@@ -691,6 +691,21 @@ Future<Response> _declareBankruptcy(
 
   final seats = (players as List).cast<Map<String, dynamic>>();
 
+  // End immediately on first bankruptcy when this win condition is set
+  final winningCondition = config['winning_condition'] as String? ?? 'last_player_standing';
+  if (winningCondition == 'highest_value_first_bankruptcy') {
+    await supabase.from('game_state').update({
+      'property_ownership': ownership,
+      'houses': houses,
+      'hotels': hotels,
+      'phase': 'finished',
+      'pending_action': null,
+      'updated_at': now,
+    }).eq('room_id', roomId);
+    await _endGame(roomId, seats, state, 'highest_value_first_bankruptcy');
+    return okJson({'bankrupt': true, 'game_over': true});
+  }
+
   if (seats.length <= 1) {
     // Game over
     await supabase.from('game_state').update({

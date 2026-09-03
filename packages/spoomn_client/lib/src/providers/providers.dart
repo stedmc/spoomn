@@ -134,6 +134,8 @@ final roomConfigProvider = StreamProvider.family<Map<String, dynamic>?, String>(
       .map((rows) => rows.first as Map<String, dynamic>);
 });
 
+final draftRoomConfigProvider = StateProvider.family<Map<String, dynamic>?, String>((ref, roomId) => null);
+
 final pendingTradesProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, roomId) async* {
     try {

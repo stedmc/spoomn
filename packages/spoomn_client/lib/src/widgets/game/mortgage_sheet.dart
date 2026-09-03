@@ -29,6 +29,8 @@ class GameMortgageSheet extends ConsumerWidget {
         .toList()
       ..sort();
 
+    final colorScheme = Theme.of(context).colorScheme;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -49,6 +51,13 @@ class GameMortgageSheet extends ConsumerWidget {
 
           return Card(
             margin: const EdgeInsets.symmetric(vertical: 4),
+            color: isMortgaged ? colorScheme.errorContainer.withValues(alpha: 0.35) : null,
+            shape: isMortgaged
+                ? RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: colorScheme.error, width: 1.5),
+                  )
+                : null,
             child: ListTile(
               leading: colour != null
                   ? Container(
@@ -60,12 +69,41 @@ class GameMortgageSheet extends ConsumerWidget {
                       ),
                     )
                   : const SizedBox(width: 12),
-              title: Text(sq.name, style: const TextStyle(fontSize: 14)),
+              title: Row(
+                children: [
+                  Expanded(
+                    child: Text(sq.name, style: const TextStyle(fontSize: 14)),
+                  ),
+                  if (isMortgaged) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: colorScheme.error,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'MORTGAGED',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
               subtitle: Text(
                 isMortgaged
-                    ? 'Mortgaged  ·  £${sq.mortgageValue} to unmortgage'
+                    ? '£${sq.mortgageValue} to unmortgage'
                     : 'Unmortgaged  ·  £${sq.mortgageValue} value',
-                style: const TextStyle(fontSize: 12),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isMortgaged ? colorScheme.error : null,
+                  fontWeight: isMortgaged ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
               trailing: isMortgaged
                   ? TextButton(

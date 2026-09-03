@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,76 @@ import '../providers/providers.dart';
 import '../services/game_service.dart';
 
 // ignore_for_file: use_build_context_synchronously
+
+const Map<String, dynamic> kRoomConfigDefaults = {
+  'starting_money': 1500,
+  'bank_unlimited': false,
+  'bank_starting_amount': 20580,
+  'house_limit': 32,
+  'hotel_limit': 12,
+  'turn_order_method': 'highest_roll',
+  'dice_count': 2,
+  'dice_sides': 6,
+  'doubles_enabled': true,
+  'doubles_extra_turn': true,
+  'jail_on_consecutive_doubles': 3,
+  'go_salary': 200,
+  'go_landing_bonus': 0,
+  'auto_claim_rent': true,
+  'income_tax_type': 'fixed',
+  'income_tax_amount': 200,
+  'income_tax_percentage': 10,
+  'super_tax_amount': 100,
+  'free_parking_jackpot': false,
+  'free_parking_starting_amount': 0,
+  'max_turn_time_secs': null,
+  'jail_fine': 50,
+  'jail_turns': 3,
+  'jail_doubles_escape': true,
+  'collect_go_while_in_jail': false,
+  'jailbreak_enabled': false,
+  'jailbreak_mandatory_turns': 3,
+  'jailbreak_fine_multiplier': 2,
+  'police_check_mode': 'final',
+  'police_duration': null,
+  'must_build_evenly': true,
+  'hotel_requires_four_houses': true,
+  'houses_returned_on_hotel': true,
+  'build_own_turn_only': false,
+  'sell_building_rate': 0.50,
+  'mortgage_rate': 0.50,
+  'unmortgage_interest_rate': 0.10,
+  'trade_mortgaged_properties': true,
+  'mortgage_transfer_penalty': 0.10,
+  'auction_on_decline': true,
+  'auction_style': 'ascending',
+  'auction_starting_bid': 1,
+  'auction_min_raise': 1,
+  'auction_time_per_bid_secs': 30,
+  'auction_blind_time_secs': 60,
+  'auction_min_bid': 1,
+  'dutch_start_price': null,
+  'dutch_decrement': 10,
+  'dutch_interval_secs': 5,
+  'dutch_floor_price': 1,
+  'trade_any_turn': false,
+  'multi_party_trades': false,
+  'trade_futures': false,
+  'trade_timeout_secs': null,
+  'winning_condition': 'last_player_standing',
+  'net_worth_target': 10000,
+  'net_worth_check': 'end_of_turn',
+  'turn_limit': 30,
+  'time_limit_mins': 60,
+  'bankruptcy_assets_to': 'creditor',
+  'allow_bankruptcy_negotiation': false,
+  'negotiation_timeout_secs': 120,
+  'repayment_interest_rate': 0.000,
+  'loans_enabled': false,
+  'max_loans_per_player': 3,
+  'async_turn_timeout_hours': null,
+  'async_turn_reminder_hours': null,
+};
 
 class LobbySettingsSheet extends ConsumerStatefulWidget {
   const LobbySettingsSheet({super.key, required this.roomId, required this.isHost});
@@ -20,6 +92,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
   Map<String, dynamic> _config = {};
   bool _loaded = false;
   bool _saving = false;
+  Timer? _saveTimer;
   final Map<String, TextEditingController> _controllers = {};
 
   @override
@@ -32,18 +105,31 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _config = Map<String, dynamic>.from(config);
           _loaded = true;
         });
+        ref.read(draftRoomConfigProvider(widget.roomId).notifier).state =
+            Map<String, dynamic>.from(config);
       }
     });
   }
 
   @override
   void dispose() {
-    for (final c in _controllers.values) c.dispose();
+    _saveTimer?.cancel();
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   TextEditingController _ctrl(String key, String text) =>
       _controllers.putIfAbsent(key, () => TextEditingController(text: text));
+
+  void _update(String key, dynamic value) {
+    setState(() => _config[key] = value);
+    ref.read(draftRoomConfigProvider(widget.roomId).notifier).state =
+        Map<String, dynamic>.from(_config);
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 800), _apply);
+  }
 
   Future<void> _apply() async {
     if (_saving) return;
@@ -53,11 +139,6 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
         ..remove('room_id')
         ..remove('created_at');
       await ref.read(gameServiceProvider).updateConfig(widget.roomId, updates);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Settings saved'), duration: Duration(seconds: 2)),
-        );
-      }
     } on GameServiceException catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
@@ -69,33 +150,74 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
 
   // ---- Tile helpers ----
 
+  bool _isDefault(String key) {
+    if (!kRoomConfigDefaults.containsKey(key)) return true;
+    final def = kRoomConfigDefaults[key];
+    final cur = _config[key];
+    if (def == null && cur == null) return true;
+    if (def == null || cur == null) return false;
+    if (def is double || cur is double) {
+      return (def as num).toDouble() == (cur as num).toDouble();
+    }
+    return def == cur;
+  }
+
+  Widget _resetBtn(String key) => Tooltip(
+        message: 'Reset to default',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () => _update(key, kRoomConfigDefaults[key]),
+          child: const Padding(
+            padding: EdgeInsets.all(4),
+            child: Icon(Icons.restart_alt, size: 14, color: Colors.orange),
+          ),
+        ),
+      );
+
   Widget _switchTile(String key, String title, {String? subtitle, bool enabled = true}) {
-    return SwitchListTile(
+    final current = _config[key] as bool? ?? false;
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
+    return ListTile(
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      value: _config[key] as bool? ?? false,
-      onChanged: (enabled && widget.isHost) ? (v) => setState(() => _config[key] = v) : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showReset) _resetBtn(key),
+          Switch(
+            value: current,
+            onChanged: (enabled && widget.isHost) ? (v) => _update(key, v) : null,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _intTile(String key, String title, {String? subtitle, bool enabled = true}) {
     final ctrl = _ctrl(key, (_config[key] as int?)?.toString() ?? '');
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
     return ListTile(
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: SizedBox(
-        width: 80,
-        child: TextField(
-          controller: ctrl,
-          enabled: enabled && widget.isHost,
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.end,
-          decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
-          onChanged: (v) {
-            final n = int.tryParse(v);
-            if (n != null) setState(() => _config[key] = n);
-          },
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showReset) _resetBtn(key),
+          SizedBox(
+            width: 80,
+            child: TextField(
+              controller: ctrl,
+              enabled: enabled && widget.isHost,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.end,
+              decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
+              onChanged: (v) {
+                final n = int.tryParse(v);
+                if (n != null) _update(key, n);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -110,6 +232,8 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     final value = _config[key] as int?;
     final isNull = value == null;
     final ctrl = _ctrl(key, value?.toString() ?? '0');
+    final defaultVal = kRoomConfigDefaults[key];
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
 
     return ListTile(
       title: Text(title),
@@ -118,6 +242,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (showReset) _resetBtn(key),
           if (isNull) ...[
             Text(
               nullLabel,
@@ -131,8 +256,8 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 tooltip: 'Set custom value',
                 onPressed: () {
-                  ctrl.text = '0';
-                  setState(() => _config[key] = 0);
+                  ctrl.text = (defaultVal as int?)?.toString() ?? '0';
+                  _update(key, defaultVal ?? 0);
                 },
               ),
           ] else ...[
@@ -147,7 +272,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
                     const InputDecoration(isDense: true, border: UnderlineInputBorder()),
                 onChanged: (v) {
                   final n = int.tryParse(v);
-                  if (n != null) setState(() => _config[key] = n);
+                  if (n != null) _update(key, n);
                 },
               ),
             ),
@@ -155,7 +280,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               IconButton(
                 icon: const Icon(Icons.close, size: 18),
                 tooltip: 'Reset to $nullLabel',
-                onPressed: () => setState(() => _config[key] = null),
+                onPressed: () => _update(key, null),
               ),
           ],
         ],
@@ -172,19 +297,26 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
   }) {
     final value = _config[key] as String? ?? opts.first.$1;
     final safeValue = opts.any((o) => o.$1 == value) ? value : opts.first.$1;
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
     return ListTile(
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: DropdownButton<String>(
-        value: safeValue,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        onChanged: (enabled && widget.isHost)
-            ? (v) {
-                if (v != null) setState(() => _config[key] = v);
-              }
-            : null,
-        items: opts.map((o) => DropdownMenuItem(value: o.$1, child: Text(o.$2))).toList(),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showReset) _resetBtn(key),
+          DropdownButton<String>(
+            value: safeValue,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            onChanged: (enabled && widget.isHost)
+                ? (v) {
+                    if (v != null) _update(key, v);
+                  }
+                : null,
+            items: opts.map((o) => DropdownMenuItem(value: o.$1, child: Text(o.$2))).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -198,19 +330,26 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
   }) {
     final raw = (_config[key] as num?)?.toInt() ?? opts.first.$1;
     final safeValue = opts.any((o) => o.$1 == raw) ? raw : opts.first.$1;
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
     return ListTile(
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: DropdownButton<int>(
-        value: safeValue,
-        isDense: true,
-        underline: const SizedBox.shrink(),
-        onChanged: (enabled && widget.isHost)
-            ? (v) {
-                if (v != null) setState(() => _config[key] = v);
-              }
-            : null,
-        items: opts.map((o) => DropdownMenuItem(value: o.$1, child: Text(o.$2))).toList(),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showReset) _resetBtn(key),
+          DropdownButton<int>(
+            value: safeValue,
+            isDense: true,
+            underline: const SizedBox.shrink(),
+            onChanged: (enabled && widget.isHost)
+                ? (v) {
+                    if (v != null) _update(key, v);
+                  }
+                : null,
+            items: opts.map((o) => DropdownMenuItem(value: o.$1, child: Text(o.$2))).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -218,22 +357,29 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
   Widget _rateTile(String key, String title, {String? subtitle, bool enabled = true}) {
     final v = (_config[key] as num?)?.toDouble();
     final ctrl = _ctrl(key, v?.toStringAsFixed(2) ?? '');
+    final showReset = !_isDefault(key) && widget.isHost && enabled;
     return ListTile(
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: SizedBox(
-        width: 80,
-        child: TextField(
-          controller: ctrl,
-          enabled: enabled && widget.isHost,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          textAlign: TextAlign.end,
-          decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
-          onChanged: (s) {
-            final d = double.tryParse(s);
-            if (d != null) setState(() => _config[key] = d);
-          },
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (showReset) _resetBtn(key),
+          SizedBox(
+            width: 80,
+            child: TextField(
+              controller: ctrl,
+              enabled: enabled && widget.isHost,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              textAlign: TextAlign.end,
+              decoration: const InputDecoration(isDense: true, border: UnderlineInputBorder()),
+              onChanged: (s) {
+                final d = double.tryParse(s);
+                if (d != null) _update(key, d);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -269,6 +415,8 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (_saving)
+          const LinearProgressIndicator(minHeight: 2),
         _section('Setup & Bank', [
           _intTile('starting_money', 'Starting money',
               subtitle: 'Cash each player begins with'),
@@ -426,6 +574,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
         _section('Winning Condition', [
           _enumTile('winning_condition', 'Win condition', [
             ('last_player_standing', 'Last player standing'),
+            ('highest_value_first_bankruptcy', 'Highest value at first bankruptcy'),
             ('net_worth_target', 'Net worth target'),
             ('turn_limit', 'Turn limit'),
             ('time_limit', 'Time limit'),
@@ -461,10 +610,6 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
         _section('Loans', [
           _switchTile('loans_enabled', 'Loans enabled',
               subtitle: 'Players can borrow from the bank'),
-          _intTile('loan_amount', 'Loan amount',
-              subtitle: 'Fixed amount per loan', enabled: loansEnabled),
-          _rateTile('loan_interest_rate', 'Loan interest rate',
-              subtitle: 'Interest charged on outstanding loans', enabled: loansEnabled),
           _intTile('max_loans_per_player', 'Max loans per player',
               subtitle: 'Outstanding loan limit per player', enabled: loansEnabled),
         ]),
@@ -474,22 +619,6 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _nullIntTile('async_turn_reminder_hours', 'Reminder before expiry', 'No reminder',
               subtitle: 'Hours before expiry to send a reminder'),
         ]),
-        if (widget.isHost)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: _saving
-                ? const Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
-                : FilledButton(
-                    onPressed: _apply,
-                    child: const Text('Apply Settings'),
-                  ),
-          ),
         const SizedBox(height: 8),
       ],
     );
