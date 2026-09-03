@@ -282,7 +282,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     );
   }
 
-  Widget _buildNonDefaultRules(Map<String, dynamic>? config) {
+  Widget _buildNonDefaultRules(Map<String, dynamic>? config, {required bool isHost}) {
     if (config == null) {
       return const Padding(
         padding: EdgeInsets.all(16),
@@ -290,10 +290,10 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       );
     }
 
-    final rules = <String>[];
+    final rules = <(String, String)>[];
     for (final entry in config.entries) {
       final label = _ruleLabel(entry.key, entry.value);
-      if (label != null) rules.add(label);
+      if (label != null) rules.add((entry.key, label));
     }
 
     if (rules.isEmpty) {
@@ -310,19 +310,33 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: rules.length,
-      itemBuilder: (_, i) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Icons.circle, size: 6, color: Colors.orange),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(rules[i], style: const TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-      ),
+      itemBuilder: (_, i) {
+        final (key, label) = rules[i];
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Icon(Icons.circle, size: 6, color: Colors.orange),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(label, style: const TextStyle(fontSize: 12)),
+              ),
+              if (isHost)
+                InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => ref
+                      .read(resetConfigKeyProvider(widget.roomId).notifier)
+                      .state = key,
+                  child: const Padding(
+                    padding: EdgeInsets.all(3),
+                    child: Icon(Icons.close, size: 13, color: Colors.grey),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -498,7 +512,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                         Expanded(
                           child: SingleChildScrollView(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: _buildNonDefaultRules(draftConfig ?? config),
+                            child: _buildNonDefaultRules(draftConfig ?? config, isHost: isHost),
                           ),
                         ),
                       ],
@@ -537,7 +551,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                   child: Text('Custom Rules', style: Theme.of(context).textTheme.titleSmall),
                 ),
-                _buildNonDefaultRules(config),
+                _buildNonDefaultRules(config, isHost: isHost),
                 const Divider(height: 1),
                 // Settings
                 if (isHost) ...[

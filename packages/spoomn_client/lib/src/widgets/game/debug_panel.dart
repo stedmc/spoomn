@@ -147,7 +147,7 @@ class _GameDebugPanelState extends ConsumerState<GameDebugPanel> {
         {'player_id': _teleportTarget ?? widget.actingAs, 'square': sq},
       );
     } on GameServiceException catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }

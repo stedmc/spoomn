@@ -24,7 +24,7 @@ Future<CardDrawResult> drawAndApply({
                 label: c['label'] as String,
                 effect: c['effect'] as Map<String, dynamic>,
                 keep: (c['keep'] as bool?) ?? false,
-              ))
+              ),)
           .toList()
       : defaultDeck;
 
@@ -85,11 +85,11 @@ Future<_EffectResult> _applyEffect({
 
   return switch (type) {
     'move_to' => _effectMoveTo(
-        effect, playerId, positions, balances, currentPos, goSalary),
+        effect, playerId, positions, balances, currentPos, goSalary,),
     'move_relative' => _effectMoveRelative(
-        effect, playerId, positions, balances, currentPos, goSalary),
+        effect, playerId, positions, balances, currentPos, goSalary,),
     'move_to_nearest' => _effectMoveToNearest(
-        effect, playerId, positions, balances, currentPos, goSalary, state),
+        effect, playerId, positions, balances, currentPos, goSalary, state,),
     'collect' => _effectCollect(effect, playerId, balances),
     'pay' => _effectPay(effect, playerId, balances, state, config),
     'collect_from_each' =>
@@ -122,7 +122,7 @@ _EffectResult _effectMoveTo(
   return _EffectResult(stateUpdates: {
     'board_positions': positions,
     'balances': balances,
-  });
+  },);
 }
 
 _EffectResult _effectMoveRelative(
@@ -144,7 +144,7 @@ _EffectResult _effectMoveRelative(
   return _EffectResult(stateUpdates: {
     'board_positions': positions,
     'balances': balances,
-  });
+  },);
 }
 
 _EffectResult _effectMoveToNearest(
@@ -326,7 +326,7 @@ _EffectResult _effectKeepGoojf(
   return _EffectResult(stateUpdates: {
     'get_out_of_jail_cards': cards,
     'jail_status': jailStatus,
-  });
+  },);
 }
 
 _EffectResult _effectRentProtection(

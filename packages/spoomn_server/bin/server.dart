@@ -17,7 +17,7 @@ void main() async {
   final port = int.parse(Platform.environment['PORT'] ?? '8080');
   final server = await io.serve(handler, InternetAddress.anyIPv4, port);
 
-  print('Server listening on port ${server.port}');
+  stderr.writeln('Server listening on port ${server.port}');
 }
 
 Middleware _cors() {

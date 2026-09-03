@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:collection/collection.dart';
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart' show params;
+import 'package:shelf_router/shelf_router.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../db/supabase_client.dart';
@@ -15,7 +15,7 @@ import 'mortgage_handler.dart' as mortgage;
 import 'trade_handler.dart' as trade;
 
 Future<Response> handleAction(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
   final action = body['action'] as String?;
   final payload = (body['payload'] as Map<String, dynamic>?) ?? {};
@@ -147,7 +147,7 @@ Future<Response> _rollDice(
 
   if (inJail) {
     return _rollDiceInJail(
-        roomId, playerId, state, config, roll, total, isDoubles, playerJail);
+        roomId, playerId, state, config, roll, total, isDoubles, playerJail,);
   }
 
   // --- Normal roll path ---
@@ -158,12 +158,12 @@ Future<Response> _rollDice(
   if (isDoubles && jailOnN != null && consecutiveDoubles >= jailOnN) {
     await _sendToJail(roomId, playerId, state, consecutiveDoubles: 0);
     await _writeLog(roomId, playerId, state['turn_number'] as int, 'roll_dice',
-        {'roll': roll, 'sent_to_jail': true});
+        {'roll': roll, 'sent_to_jail': true},);
     return okJson({'roll': roll, 'sent_to_jail': true});
   }
 
   final positions = Map<String, dynamic>.from(
-      state['board_positions'] as Map<String, dynamic>);
+      state['board_positions'] as Map<String, dynamic>,);
   final currentPos = (positions[playerId] as int?) ?? 0;
   final newPos = (currentPos + total) % Board.boardSize;
   final passedGo = newPos < currentPos;
@@ -188,7 +188,7 @@ Future<Response> _rollDice(
         ? (config['go_landing_bonus'] as int? ?? 0)
         : 0;
     final balances = Map<String, dynamic>.from(
-        state['balances'] as Map<String, dynamic>);
+        state['balances'] as Map<String, dynamic>,);
     balances[playerId] =
         ((balances[playerId] as int?) ?? 0) + goSalary + goBonus;
     updates['balances'] = balances;
@@ -208,7 +208,7 @@ Future<Response> _rollDice(
   await supabase.from('game_state').update(updates).eq('room_id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int, 'roll_dice',
-      {'roll': roll, 'new_position': newPos, 'passed_go': passedGo});
+      {'roll': roll, 'new_position': newPos, 'passed_go': passedGo},);
 
   // Resolve landing square effect and set pending_action
   await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
@@ -260,7 +260,7 @@ Future<Response> _buyProperty(
   }).eq('room_id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int,
-      'buy_property', {'square': squareIndex, 'price': square.price});
+      'buy_property', {'square': squareIndex, 'price': square.price},);
 
   return okJson({'bought': true, 'square': squareIndex});
 }
@@ -269,12 +269,6 @@ Future<Response> _buyProperty(
 // Stub handlers (to be fully implemented)
 // ---------------------------------------------------------------------------
 
-Future<Response> _declineProperty(String roomId, String playerId,
-    Map<String, dynamic> state, Map<String, dynamic> config) async {
-  // TODO: trigger auction if auction_on_decline, else phase = trade
-  return okJson({'declined': true});
-}
-
 Future<Response> _payJailFine(
   String roomId,
   String playerId,
@@ -282,9 +276,9 @@ Future<Response> _payJailFine(
   Map<String, dynamic> config,
 ) async {
   final jailStatus = Map<String, dynamic>.from(
-      state['jail_status'] as Map<String, dynamic>);
+      state['jail_status'] as Map<String, dynamic>,);
   final playerJail = Map<String, dynamic>.from(
-      jailStatus[playerId] as Map<String, dynamic>? ?? {});
+      jailStatus[playerId] as Map<String, dynamic>? ?? {},);
 
   if (playerJail['in_jail'] != true) {
     return errorJson(400, 'RULE_VIOLATION', 'Player is not in jail');
@@ -296,7 +290,7 @@ Future<Response> _payJailFine(
   final fine = (playerJail['effective_fine'] as int?) ??
       (config['jail_fine'] as int? ?? 50);
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
 
   if (((balances[playerId] as int?) ?? 0) < fine) {
     return errorJson(400, 'INSUFFICIENT_FUNDS', 'Not enough money to pay jail fine');
@@ -321,7 +315,7 @@ Future<Response> _payJailFine(
 
   await supabase.from('game_state').update(updates).eq('room_id', roomId);
   await _writeLog(roomId, playerId, state['turn_number'] as int,
-      'pay_jail_fine', {'fine': fine});
+      'pay_jail_fine', {'fine': fine},);
 
   return okJson({'paid': true, 'fine': fine});
 }
@@ -333,9 +327,9 @@ Future<Response> _useGoojfCard(
   Map<String, dynamic> config,
 ) async {
   final jailStatus = Map<String, dynamic>.from(
-      state['jail_status'] as Map<String, dynamic>);
+      state['jail_status'] as Map<String, dynamic>,);
   final playerJail = Map<String, dynamic>.from(
-      jailStatus[playerId] as Map<String, dynamic>? ?? {});
+      jailStatus[playerId] as Map<String, dynamic>? ?? {},);
 
   if (playerJail['in_jail'] != true) {
     return errorJson(400, 'RULE_VIOLATION', 'Player is not in jail');
@@ -345,7 +339,7 @@ Future<Response> _useGoojfCard(
   }
 
   final goojfCards = Map<String, dynamic>.from(
-      state['get_out_of_jail_cards'] as Map<String, dynamic>);
+      state['get_out_of_jail_cards'] as Map<String, dynamic>,);
   final cardCount = (goojfCards[playerId] as int?) ?? 0;
 
   if (cardCount <= 0) {
@@ -366,7 +360,7 @@ Future<Response> _useGoojfCard(
   }).eq('room_id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int,
-      'use_goojf_card', {});
+      'use_goojf_card', {},);
 
   return okJson({'used': true});
 }
@@ -382,9 +376,9 @@ Future<Response> _jailbreak(
   }
 
   final jailStatus = Map<String, dynamic>.from(
-      state['jail_status'] as Map<String, dynamic>);
+      state['jail_status'] as Map<String, dynamic>,);
   final playerJail = Map<String, dynamic>.from(
-      jailStatus[playerId] as Map<String, dynamic>? ?? {});
+      jailStatus[playerId] as Map<String, dynamic>? ?? {},);
 
   if (playerJail['in_jail'] != true) {
     return errorJson(400, 'RULE_VIOLATION', 'Player is not in jail');
@@ -400,7 +394,7 @@ Future<Response> _jailbreak(
 
   final policeDuration = config['police_duration'] as int?;
   final activePawns = List<dynamic>.from(
-      state['active_police_pawns'] as List<dynamic>);
+      state['active_police_pawns'] as List<dynamic>,);
   activePawns.add({
     'owner_id': playerId,
     'position': Board.jailSquare,
@@ -415,7 +409,7 @@ Future<Response> _jailbreak(
   }).eq('room_id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int,
-      'jailbreak', {'police_spawned_at': Board.jailSquare});
+      'jailbreak', {'police_spawned_at': Board.jailSquare},);
 
   return okJson({'jailbreaking': true});
 }
@@ -538,7 +532,7 @@ Future<Response> _endTurn(
   }).eq('id', roomId);
 
   await _writeLog(roomId, playerId, currentTurn, 'end_turn',
-      {'next_player': nextPlayerId});
+      {'next_player': nextPlayerId},);
 
   // Async mode: send push notification to next player
   if (room['play_mode'] == 'async') {
@@ -594,7 +588,7 @@ Future<Response?> _processRepayments(
       // Missed instalment → bankruptcy
       // TODO: liquidate assets then declare bankruptcy
       return errorJson(400, 'REPAYMENT_DEFAULT',
-          'Insufficient funds for repayment instalment');
+          'Insufficient funds for repayment instalment',);
     }
   }
 
@@ -618,7 +612,7 @@ Future<void> _endGame(
   }).eq('room_id', roomId);
 
   await _writeLog(roomId, null, state['turn_number'] as int, 'game_over',
-      {'reason': reason});
+      {'reason': reason},);
 }
 
 Future<Response> _declareBankruptcy(
@@ -642,7 +636,7 @@ Future<Response> _declareBankruptcy(
 
   // Transfer properties to creditor or bank
   final ownership = Map<String, dynamic>.from(
-      state['property_ownership'] as Map<String, dynamic>);
+      state['property_ownership'] as Map<String, dynamic>,);
   final pendingAction = state['pending_action'] as Map<String, dynamic>?;
   final creditorId = pendingAction?['owner_id'] as String?;
 
@@ -721,7 +715,7 @@ Future<Response> _declareBankruptcy(
       'finished_at': now,
     }).eq('id', roomId);
     await _writeLog(roomId, playerId, state['turn_number'] as int, 'game_over',
-        {'reason': 'bankruptcy'});
+        {'reason': 'bankruptcy'},);
     return okJson({'bankrupt': true, 'game_over': true});
   }
 
@@ -758,7 +752,7 @@ Future<Response> _declareBankruptcy(
   }).eq('id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int, 'game_over',
-      {'reason': 'player_bankrupt', 'player_id': playerId});
+      {'reason': 'player_bankrupt', 'player_id': playerId},);
 
   return okJson({'bankrupt': true, 'next_player': nextPlayerId});
 }
@@ -839,7 +833,7 @@ Future<Response> _placeTrap(
 }
 
 Future<Response> _removeTrap(
-    String roomId, String playerId, Map<String, dynamic> payload) async {
+    String roomId, String playerId, Map<String, dynamic> payload,) async {
   final trapId = payload['trap_id'] as String?;
   if (trapId == null) return errorJson(400, 'MISSING_FIELD', 'trap_id required');
   await supabase
@@ -872,7 +866,7 @@ Future<Response> _debugTeleport(
   }
 
   final positions = Map<String, dynamic>.from(
-      state['board_positions'] as Map<String, dynamic>);
+      state['board_positions'] as Map<String, dynamic>,);
   positions[targetPlayer] = squareIndex;
 
   await supabase.from('game_state').update({
@@ -882,7 +876,7 @@ Future<Response> _debugTeleport(
 
   // Position-only: do not resolve landing effects so game flow is unaffected.
   await _writeLog(roomId, actingPlayerId, state['turn_number'] as int, 'debug_teleport',
-      {'player': targetPlayer, 'square': squareIndex});
+      {'player': targetPlayer, 'square': squareIndex},);
 
   return okJson({'teleported': true, 'player': targetPlayer, 'square': squareIndex});
 }
@@ -907,7 +901,7 @@ Future<Response> _debugAssignProperty(
 
   final toPlayerId = payload['player_id'] as String?;
   final ownership = Map<String, dynamic>.from(
-      state['property_ownership'] as Map<String, dynamic>);
+      state['property_ownership'] as Map<String, dynamic>,);
 
   if (toPlayerId == null) {
     ownership.remove('$squareIndex');
@@ -984,7 +978,7 @@ Future<Response> _rollDiceInJail(
   final jailDoublesEscape = config['jail_doubles_escape'] as bool? ?? true;
 
   final jailStatus = Map<String, dynamic>.from(
-      state['jail_status'] as Map<String, dynamic>);
+      state['jail_status'] as Map<String, dynamic>,);
 
   // Mandatory turns: serve time, no escape possible
   if (mandatoryTurns > 0) {
@@ -999,7 +993,7 @@ Future<Response> _rollDiceInJail(
       'updated_at': DateTime.now().toIso8601String(),
     }).eq('room_id', roomId);
     await _writeLog(roomId, playerId, state['turn_number'] as int,
-        'roll_dice', {'roll': roll, 'mandatory_turns_remaining': newMandatory});
+        'roll_dice', {'roll': roll, 'mandatory_turns_remaining': newMandatory},);
     return okJson({'roll': roll, 'mandatory_turns_remaining': newMandatory});
   }
 
@@ -1010,7 +1004,7 @@ Future<Response> _rollDiceInJail(
     jailStatus[playerId] = playerJail;
 
     final positions = Map<String, dynamic>.from(
-        state['board_positions'] as Map<String, dynamic>);
+        state['board_positions'] as Map<String, dynamic>,);
     final currentPos = (positions[playerId] as int?) ?? Board.jailSquare;
     final newPos = (currentPos + total) % Board.boardSize;
     positions[playerId] = newPos;
@@ -1030,7 +1024,7 @@ Future<Response> _rollDiceInJail(
     }).eq('room_id', roomId);
 
     await _writeLog(roomId, playerId, state['turn_number'] as int,
-        'roll_dice', {'roll': roll, 'escaped_jail': true, 'new_position': newPos});
+        'roll_dice', {'roll': roll, 'escaped_jail': true, 'new_position': newPos},);
     await _resolveSquareLanding(roomId, playerId, newPos, state, config);
     return okJson({'roll': roll, 'escaped_jail': true, 'new_position': newPos});
   }
@@ -1040,7 +1034,7 @@ Future<Response> _rollDiceInJail(
     final fine = (playerJail['effective_fine'] as int?) ??
         (config['jail_fine'] as int? ?? 50);
     final balances = Map<String, dynamic>.from(
-        state['balances'] as Map<String, dynamic>);
+        state['balances'] as Map<String, dynamic>,);
     balances[playerId] = ((balances[playerId] as int?) ?? 0) - fine;
 
     playerJail['in_jail'] = false;
@@ -1048,7 +1042,7 @@ Future<Response> _rollDiceInJail(
     jailStatus[playerId] = playerJail;
 
     final positions = Map<String, dynamic>.from(
-        state['board_positions'] as Map<String, dynamic>);
+        state['board_positions'] as Map<String, dynamic>,);
     final currentPos = (positions[playerId] as int?) ?? Board.jailSquare;
     final newPos = (currentPos + total) % Board.boardSize;
     positions[playerId] = newPos;
@@ -1075,7 +1069,7 @@ Future<Response> _rollDiceInJail(
         ..['balances'] = balances;
     await supabase.from('game_state').update(updates).eq('room_id', roomId);
     await _writeLog(roomId, playerId, state['turn_number'] as int,
-        'roll_dice', {'roll': roll, 'forced_fine': fine, 'new_position': newPos});
+        'roll_dice', {'roll': roll, 'forced_fine': fine, 'new_position': newPos},);
     await _resolveSquareLanding(roomId, playerId, newPos, stateForLanding, config);
     return okJson({'roll': roll, 'forced_fine': fine, 'new_position': newPos});
   }
@@ -1091,7 +1085,7 @@ Future<Response> _rollDiceInJail(
   }).eq('room_id', roomId);
 
   await _writeLog(roomId, playerId, state['turn_number'] as int,
-      'roll_dice', {'roll': roll, 'failed_jail_roll': true, 'turns_in_jail': turnsInJail + 1});
+      'roll_dice', {'roll': roll, 'failed_jail_roll': true, 'turns_in_jail': turnsInJail + 1},);
   return okJson({'roll': roll, 'failed_jail_roll': true, 'turns_in_jail': turnsInJail + 1});
 }
 
@@ -1134,7 +1128,7 @@ Future<void> _resolveSquareLanding(
         }).eq('room_id', roomId);
       } else if (ownerId != playerId && !mortgaged) {
         final rentModifiers = Map<String, dynamic>.from(
-            state['rent_modifiers'] as Map<String, dynamic>? ?? {});
+            state['rent_modifiers'] as Map<String, dynamic>? ?? {},);
         final immune = _hasRentImmunity(rentModifiers, playerId, ownerId);
 
         if (immune) {
@@ -1144,11 +1138,11 @@ Future<void> _resolveSquareLanding(
             'updated_at': now,
           }).eq('room_id', roomId);
           await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_immunity',
-              {'square': squareIndex, 'owner_id': ownerId});
+              {'square': squareIndex, 'owner_id': ownerId},);
         } else {
           final rent = (_calculateRent(square, squareIndex, ownerId, state) * rentMultiplier).round();
           final balances = Map<String, dynamic>.from(
-              state['balances'] as Map<String, dynamic>);
+              state['balances'] as Map<String, dynamic>,);
           final playerBalance = (balances[playerId] as int?) ?? 0;
           final actualPayment = playerBalance < rent ? playerBalance : rent;
           balances[playerId] = playerBalance - rent; // goes negative if insufficient
@@ -1168,7 +1162,7 @@ Future<void> _resolveSquareLanding(
               'updated_at': now,
             }).eq('room_id', roomId);
             await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_payment',
-                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent});
+                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent},);
           } else {
             await supabase.from('game_state').update({
               'balances': balances,
@@ -1177,7 +1171,7 @@ Future<void> _resolveSquareLanding(
               'updated_at': now,
             }).eq('room_id', roomId);
             await _writeLog(roomId, playerId, state['turn_number'] as int, 'rent_payment',
-                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent});
+                {'square': squareIndex, 'owner_id': ownerId, 'amount': rent},);
           }
         }
       } else {
@@ -1218,7 +1212,7 @@ Future<void> _resolveSquareLanding(
         'updated_at': now,
       }).eq('room_id', roomId);
       await _writeLog(roomId, playerId, state['turn_number'] as int,
-          'draw_card', result.logPayload);
+          'draw_card', result.logPayload,);
 
       final newPositions = cardUpdates['board_positions'] as Map<String, dynamic>?;
       if (!cardCausedBankruptcy && newPositions != null) {
@@ -1236,7 +1230,7 @@ Future<void> _resolveSquareLanding(
     case SquareType.tax:
       final taxAmount = square.taxAmount ?? 0;
       final balances = Map<String, dynamic>.from(
-          state['balances'] as Map<String, dynamic>);
+          state['balances'] as Map<String, dynamic>,);
       final preTaxBalance = (balances[playerId] as int?) ?? 0;
       balances[playerId] = preTaxBalance - taxAmount;
       final canPayTax = preTaxBalance >= taxAmount;
@@ -1254,7 +1248,7 @@ Future<void> _resolveSquareLanding(
       }
       await supabase.from('game_state').update(taxUpdates).eq('room_id', roomId);
       await _writeLog(roomId, playerId, state['turn_number'] as int, 'tax_payment',
-          {'square': squareIndex, 'amount': taxAmount});
+          {'square': squareIndex, 'amount': taxAmount},);
 
     case SquareType.freeParking:
       final jackpot = config['free_parking_jackpot'] as bool? ?? false;
@@ -1262,7 +1256,7 @@ Future<void> _resolveSquareLanding(
         final pot = (state['free_parking_pot'] as int?) ?? 0;
         if (pot > 0) {
           final balances = Map<String, dynamic>.from(
-              state['balances'] as Map<String, dynamic>);
+              state['balances'] as Map<String, dynamic>,);
           balances[playerId] = ((balances[playerId] as int?) ?? 0) + pot;
           await supabase.from('game_state').update({
             'balances': balances,
@@ -1318,7 +1312,7 @@ Future<void> _resolveTrapTriggers(
   if ((traps as List).isEmpty) return;
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
 
   for (final trap in traps.cast<Map<String, dynamic>>()) {
     if (trap['owner_id'] == playerId) continue; // own trap: no trigger
@@ -1350,7 +1344,7 @@ Future<void> _resolveTrapTriggers(
     }
 
     await _writeLog(roomId, playerId, state['turn_number'] as int,
-        'trap_triggered', {'trap_id': trap['id'], 'amount': amount, 'square': squareIndex});
+        'trap_triggered', {'trap_id': trap['id'], 'amount': amount, 'square': squareIndex},);
   }
 
   await supabase.from('game_state').update({
@@ -1418,7 +1412,7 @@ int _calculateRent(
           .entries
           .where((e) =>
               e.value.colourGroup != null &&
-              e.value.colourGroup == square.colourGroup)
+              e.value.colourGroup == square.colourGroup,)
           .map((e) => e.key)
           .toList();
       final ownsMonopoly =
@@ -1431,7 +1425,7 @@ int _calculateRent(
           .entries
           .where((e) =>
               e.value.type == SquareType.station &&
-              ownership['${e.key}'] == ownerId)
+              ownership['${e.key}'] == ownerId,)
           .length;
       // 25 → 50 → 100 → 200
       return 25 * (1 << (stationsOwned - 1).clamp(0, 3));
@@ -1445,7 +1439,7 @@ int _calculateRent(
           .entries
           .where((e) =>
               e.value.type == SquareType.utility &&
-              ownership['${e.key}'] == ownerId)
+              ownership['${e.key}'] == ownerId,)
           .length;
       return diceTotal * (utilitiesOwned >= 2 ? 10 : 4);
 

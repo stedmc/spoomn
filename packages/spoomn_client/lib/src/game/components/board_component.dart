@@ -4,7 +4,7 @@ import 'package:spoomn_core/spoomn_core.dart';
 
 import '../spoomn_game.dart';
 
-class BoardComponent extends PositionComponent with HasGameRef {
+class BoardComponent extends PositionComponent with HasGameReference {
   late List<Rect> squareRects;
   Map<int, Color> highlightedSquares = {};
   Map<int, Color> squareOwnerColours = {};
@@ -19,13 +19,13 @@ class BoardComponent extends PositionComponent with HasGameRef {
 
   @override
   Future<void> onLoad() async {
-    final boardWidth = gameRef.size.x < gameRef.size.y
-        ? gameRef.size.x
-        : gameRef.size.y;
+    final boardWidth = game.size.x < game.size.y
+        ? game.size.x
+        : game.size.y;
     size = Vector2.all(boardWidth);
     position = Vector2(
-      (gameRef.size.x - boardWidth) / 2,
-      (gameRef.size.y - boardWidth) / 2,
+      (game.size.x - boardWidth) / 2,
+      (game.size.y - boardWidth) / 2,
     );
     squareRects = _computeSquareRects(boardWidth);
   }
@@ -176,7 +176,7 @@ class BoardComponent extends PositionComponent with HasGameRef {
   void _drawLabel(Canvas canvas, int index, Rect rect, BoardSquare square) {
     final isCorner = index == 0 || index == 10 || index == 20 || index == 30;
     final isVertical = rect.height > rect.width * 1.4;
-    final baseFontSize = (gameRef as SpoomnGame).boardFontSize;
+    final baseFontSize = (game as SpoomnGame).boardFontSize;
     final fontSize = isCorner ? baseFontSize * 1.4 : baseFontSize;
 
     final tp = TextPainter(

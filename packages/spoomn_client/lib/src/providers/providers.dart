@@ -41,7 +41,7 @@ Stream<GameState> gameState(GameStateRef ref, String roomId) async* {
         .select()
         .eq('room_id', roomId)
         .maybeSingle();
-    if (row != null) yield GameState.fromJson(row as Map<String, dynamic>);
+    if (row != null) yield GameState.fromJson(row);
   } catch (_) {}
   yield* Supabase.instance.client
       .from('game_state')
@@ -124,17 +124,19 @@ final roomConfigProvider = StreamProvider.family<Map<String, dynamic>?, String>(
         .select()
         .eq('room_id', roomId)
         .maybeSingle();
-    if (row != null) yield row as Map<String, dynamic>;
+    if (row != null) yield row;
   } catch (_) {}
   yield* Supabase.instance.client
       .from('room_configs')
       .stream(primaryKey: ['room_id'])
       .eq('room_id', roomId)
       .where((rows) => rows.isNotEmpty)
-      .map((rows) => rows.first as Map<String, dynamic>);
+      .map((rows) => rows.first);
 });
 
 final draftRoomConfigProvider = StateProvider.family<Map<String, dynamic>?, String>((ref, roomId) => null);
+
+final resetConfigKeyProvider = StateProvider.family<String?, String>((ref, roomId) => null);
 
 final pendingTradesProvider = StreamProvider.family<List<Map<String, dynamic>>, String>(
   (ref, roomId) async* {

@@ -60,7 +60,7 @@ Future<Response> buildHouse(
     final minHouses = groupHouses.reduce((a, b) => a < b ? a : b);
     if (currentHouses > minHouses) {
       return errorJson(400, 'RULE_VIOLATION',
-          'Must build evenly: other properties have fewer houses');
+          'Must build evenly: other properties have fewer houses',);
     }
   }
 
@@ -94,7 +94,7 @@ Future<Response> buildHouse(
   }
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   final cost = square.houseCost!;
 
   if (((balances[playerId] as int?) ?? 0) < cost) {
@@ -155,7 +155,7 @@ Future<Response> buildHotel(
       if (idx == squareIndex) continue;
       if (hotels['$idx'] != true && ((houses['$idx'] as int?) ?? 0) < 4) {
         return errorJson(400, 'RULE_VIOLATION',
-            'Must build evenly: all properties need 4 houses before building hotel');
+            'Must build evenly: all properties need 4 houses before building hotel',);
       }
     }
   }
@@ -171,7 +171,7 @@ Future<Response> buildHotel(
   }
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   final cost = square.hotelCost!;
 
   if (((balances[playerId] as int?) ?? 0) < cost) {
@@ -230,7 +230,7 @@ Future<Response> sellHouse(
     final maxHouses = groupHouses.reduce((a, b) => a > b ? a : b);
     if (currentHouses < maxHouses) {
       return errorJson(400, 'RULE_VIOLATION',
-          'Must sell evenly: other properties have more houses');
+          'Must sell evenly: other properties have more houses',);
     }
   }
 
@@ -240,7 +240,7 @@ Future<Response> sellHouse(
   houses['$squareIndex'] = currentHouses - 1;
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   balances[playerId] = ((balances[playerId] as int?) ?? 0) + proceeds;
 
   await supabase.from('game_state').update({
@@ -290,7 +290,7 @@ Future<Response> sellHotel(
       final available = houseLimit - usedHouses - (housesReturnedOnHotel ? 0 : hotelCount * 4);
       if (available < 4) {
         return errorJson(400, 'RULE_VIOLATION',
-            'Not enough houses in pool to replace hotel (need 4, have $available)');
+            'Not enough houses in pool to replace hotel (need 4, have $available)',);
       }
     }
   }
@@ -300,7 +300,7 @@ Future<Response> sellHotel(
 
   hotels.remove('$squareIndex');
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   balances[playerId] = ((balances[playerId] as int?) ?? 0) + proceeds;
 
   final updates = <String, dynamic>{

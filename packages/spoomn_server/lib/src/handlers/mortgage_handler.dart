@@ -37,7 +37,7 @@ Future<Response> mortgageProperty(
     for (final idx in group) {
       if (((houses['$idx'] as int?) ?? 0) > 0 || hotels['$idx'] == true) {
         return errorJson(400, 'RULE_VIOLATION',
-            'Must sell all buildings in colour group before mortgaging');
+            'Must sell all buildings in colour group before mortgaging',);
       }
     }
   }
@@ -47,7 +47,7 @@ Future<Response> mortgageProperty(
 
   mortgaged.add(squareIndex);
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   balances[playerId] = ((balances[playerId] as int?) ?? 0) + mortgageValue;
 
   await supabase.from('game_state').update({
@@ -93,11 +93,11 @@ Future<Response> unmortgageProperty(
   final totalCost = (square.price! * mortgageRate * (1 + interestRate)).ceil();
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
 
   if (((balances[playerId] as int?) ?? 0) < totalCost) {
     return errorJson(400, 'INSUFFICIENT_FUNDS',
-        'Need £$totalCost to unmortgage (mortgage value + interest)');
+        'Need £$totalCost to unmortgage (mortgage value + interest)',);
   }
 
   mortgaged.remove(squareIndex);

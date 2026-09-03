@@ -73,7 +73,7 @@ Future<Response> submitBid(
   }
 
   final auction = Map<String, dynamic>.from(
-      state['active_auction'] as Map<String, dynamic>);
+      state['active_auction'] as Map<String, dynamic>,);
   final style = auction['style'] as String;
   final passed = List<String>.from(auction['passed'] as List);
 
@@ -100,7 +100,7 @@ Future<Response> passBid(
   }
 
   final auction = Map<String, dynamic>.from(
-      state['active_auction'] as Map<String, dynamic>);
+      state['active_auction'] as Map<String, dynamic>,);
   final style = auction['style'] as String;
   final passed = List<String>.from(auction['passed'] as List);
 
@@ -173,7 +173,7 @@ Future<Response> _bidAscending(
 
   if (bidAmount < currentPrice + minRaise) {
     return errorJson(400, 'BID_TOO_LOW',
-        'Bid must be at least ${currentPrice + minRaise}');
+        'Bid must be at least ${currentPrice + minRaise}',);
   }
 
   final balances = state['balances'] as Map<String, dynamic>;
@@ -296,9 +296,9 @@ Future<Response> _finaliseAuction(
   final winningBid = (bids[winnerId] as int?) ?? (auction['current_price'] as int? ?? 0);
 
   final balances = Map<String, dynamic>.from(
-      state['balances'] as Map<String, dynamic>);
+      state['balances'] as Map<String, dynamic>,);
   final ownership = Map<String, dynamic>.from(
-      state['property_ownership'] as Map<String, dynamic>);
+      state['property_ownership'] as Map<String, dynamic>,);
 
   balances[winnerId] = ((balances[winnerId] as int?) ?? 0) - winningBid;
   ownership['$squareIndex'] = winnerId;

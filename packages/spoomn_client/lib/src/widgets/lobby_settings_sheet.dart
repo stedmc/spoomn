@@ -150,6 +150,19 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
 
   // ---- Tile helpers ----
 
+  void _resetKey(String key) {
+    final defaultVal = kRoomConfigDefaults[key];
+    _update(key, defaultVal);
+    final ctrl = _controllers[key];
+    if (ctrl != null) {
+      ctrl.text = switch (defaultVal) {
+        null => '',
+        double v => v.toStringAsFixed(2),
+        _ => '$defaultVal',
+      };
+    }
+  }
+
   bool _isDefault(String key) {
     if (!kRoomConfigDefaults.containsKey(key)) return true;
     final def = kRoomConfigDefaults[key];
@@ -384,9 +397,37 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     );
   }
 
-  Widget _section(String title, List<Widget> children) {
+  int _countCustom(List<String> keys) => keys.where((k) => !_isDefault(k)).length;
+
+  Widget _badge(int count) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.orange.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.orange.withValues(alpha: 0.5)),
+        ),
+        child: Text(
+          '$count custom',
+          style: const TextStyle(
+            fontSize: 10,
+            color: Colors.orange,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      );
+
+  Widget _section(String title, List<String> sectionKeys, List<Widget> children) {
+    final n = _countCustom(sectionKeys);
     return ExpansionTile(
-      title: Text(title),
+      title: Row(
+        children: [
+          Text(title),
+          if (n > 0) ...[
+            const SizedBox(width: 8),
+            _badge(n),
+          ],
+        ],
+      ),
       children: children,
     );
   }
@@ -411,13 +452,20 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     final allowNeg = _config['allow_bankruptcy_negotiation'] as bool? ?? false;
     final loansEnabled = _config['loans_enabled'] as bool? ?? false;
 
+    ref.listen(resetConfigKeyProvider(widget.roomId), (_, key) {
+      if (key != null && mounted) {
+        _resetKey(key);
+        ref.read(resetConfigKeyProvider(widget.roomId).notifier).state = null;
+      }
+    });
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (_saving)
           const LinearProgressIndicator(minHeight: 2),
-        _section('Setup & Bank', [
+        _section('Setup & Bank', ['starting_money', 'bank_unlimited', 'bank_starting_amount', 'house_limit', 'hotel_limit', 'turn_order_method'], [
           _intTile('starting_money', 'Starting money',
               subtitle: 'Cash each player begins with'),
           _switchTile('bank_unlimited', 'Unlimited bank',
@@ -434,7 +482,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
             ('host_assigned', 'Host assigned'),
           ], subtitle: 'How player order is decided'),
         ]),
-        _section('Dice', [
+        _section('Dice', ['dice_count', 'dice_sides', 'doubles_enabled', 'doubles_extra_turn', 'jail_on_consecutive_doubles'], [
           _intTile('dice_count', 'Dice count',
               subtitle: 'Number of dice rolled per turn (1–4)'),
           _intChoiceTile('dice_sides', 'Die sides', [
@@ -447,16 +495,16 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _nullIntTile('jail_on_consecutive_doubles', 'Jail after N doubles', 'Never',
               subtitle: 'Go to jail after this many doubles in a row', enabled: doubles),
         ]),
-        _section('Movement & Go', [
+        _section('Movement & Go', ['go_salary', 'go_landing_bonus'], [
           _intTile('go_salary', 'Go salary', subtitle: 'Collect when passing Go'),
           _intTile('go_landing_bonus', 'Go landing bonus',
               subtitle: 'Extra cash for landing exactly on Go'),
         ]),
-        _section('Rent', [
+        _section('Rent', ['auto_claim_rent'], [
           _switchTile('auto_claim_rent', 'Auto-claim rent',
               subtitle: 'Server deducts rent on landing automatically'),
         ]),
-        _section('Tax', [
+        _section('Tax', ['income_tax_type', 'income_tax_amount', 'income_tax_percentage', 'super_tax_amount'], [
           _enumTile('income_tax_type', 'Income tax type', [
             ('fixed', 'Fixed amount'),
             ('percentage', 'Percentage of net worth'),
@@ -467,17 +515,17 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Tax as % of net worth', enabled: incomeTaxType == 'percentage'),
           _intTile('super_tax_amount', 'Super tax amount', subtitle: 'Luxury tax charged'),
         ]),
-        _section('Free Parking', [
+        _section('Free Parking', ['free_parking_jackpot', 'free_parking_starting_amount'], [
           _switchTile('free_parking_jackpot', 'Free parking jackpot',
               subtitle: 'Taxes & fines pool on Free Parking'),
           _intTile('free_parking_starting_amount', 'Starting pot amount',
               subtitle: 'Initial jackpot seeded into pot', enabled: freeParkingJackpot),
         ]),
-        _section('Turn Timer', [
+        _section('Turn Timer', ['max_turn_time_secs'], [
           _nullIntTile('max_turn_time_secs', 'Max turn time', 'No limit',
               subtitle: 'Seconds before turn auto-ends'),
         ]),
-        _section('Jail', [
+        _section('Jail', ['jail_fine', 'jail_turns', 'jail_doubles_escape', 'collect_go_while_in_jail'], [
           _intTile('jail_fine', 'Jail fine', subtitle: 'Cost to pay out of jail'),
           _intTile('jail_turns', 'Jail turns',
               subtitle: 'Turns before forced payment'),
@@ -486,7 +534,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _switchTile('collect_go_while_in_jail', 'Collect Go while jailed',
               subtitle: 'Receive Go salary when passing while jailed'),
         ]),
-        _section('Jailbreak', [
+        _section('Jailbreak', ['jailbreak_enabled', 'jailbreak_mandatory_turns', 'jailbreak_fine_multiplier', 'police_check_mode', 'police_duration'], [
           _switchTile('jailbreak_enabled', 'Jailbreak enabled',
               subtitle: 'Police pawn can re-arrest escaped players'),
           _intTile('jailbreak_mandatory_turns', 'Mandatory turns after catch',
@@ -503,7 +551,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _nullIntTile('police_duration', 'Police pawn lifespan', 'Indefinite',
               subtitle: 'Turns before police pawn is removed', enabled: jailbreakEnabled),
         ]),
-        _section('Buildings', [
+        _section('Buildings', ['must_build_evenly', 'hotel_requires_four_houses', 'houses_returned_on_hotel', 'build_own_turn_only', 'sell_building_rate'], [
           _switchTile('must_build_evenly', 'Must build evenly',
               subtitle: 'Houses must be spread across the color group'),
           _switchTile('hotel_requires_four_houses', 'Hotel requires 4 houses',
@@ -515,7 +563,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _rateTile('sell_building_rate', 'Sell building rate',
               subtitle: 'Fraction of cost returned on sale (0–1)'),
         ]),
-        _section('Mortgage', [
+        _section('Mortgage', ['mortgage_rate', 'unmortgage_interest_rate', 'trade_mortgaged_properties', 'mortgage_transfer_penalty'], [
           _rateTile('mortgage_rate', 'Mortgage rate',
               subtitle: 'Fraction of face value received'),
           _rateTile('unmortgage_interest_rate', 'Unmortgage interest',
@@ -525,7 +573,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _rateTile('mortgage_transfer_penalty', 'Transfer penalty',
               subtitle: 'Extra fee when trading a mortgaged property'),
         ]),
-        _section('Auctions', [
+        _section('Auctions', ['auction_on_decline', 'auction_style', 'auction_starting_bid', 'auction_min_raise', 'auction_time_per_bid_secs', 'auction_blind_time_secs', 'auction_min_bid', 'dutch_start_price', 'dutch_decrement', 'dutch_interval_secs', 'dutch_floor_price'], [
           _switchTile('auction_on_decline', 'Auction on decline',
               subtitle: 'Declined properties go to auction'),
           _enumTile('auction_style', 'Auction style', [
@@ -561,7 +609,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Lowest price before auction ends',
               enabled: auctionOnDecline && auctionStyle == 'dutch'),
         ]),
-        _section('Trading', [
+        _section('Trading', ['trade_any_turn', 'multi_party_trades', 'trade_futures', 'trade_timeout_secs'], [
           _switchTile('trade_any_turn', 'Trade at any time',
               subtitle: 'Trades allowed outside own turn'),
           _switchTile('multi_party_trades', 'Multi-party trades',
@@ -571,7 +619,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _nullIntTile('trade_timeout_secs', 'Trade timeout', 'No timeout',
               subtitle: 'Seconds to accept a trade offer'),
         ]),
-        _section('Winning Condition', [
+        _section('Winning Condition', ['winning_condition', 'net_worth_target', 'net_worth_check', 'turn_limit', 'time_limit_mins'], [
           _enumTile('winning_condition', 'Win condition', [
             ('last_player_standing', 'Last player standing'),
             ('highest_value_first_bankruptcy', 'Highest value at first bankruptcy'),
@@ -595,7 +643,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Game ends after this many minutes',
               enabled: winCondition == 'time_limit'),
         ]),
-        _section('Bankruptcy', [
+        _section('Bankruptcy', ['bankruptcy_assets_to', 'allow_bankruptcy_negotiation', 'negotiation_timeout_secs', 'repayment_interest_rate'], [
           _enumTile('bankruptcy_assets_to', 'Assets go to', [
             ('creditor', 'Creditor'),
             ('bank', 'Bank'),
@@ -607,13 +655,13 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _rateTile('repayment_interest_rate', 'Repayment interest',
               subtitle: 'Interest rate on negotiated repayment plan', enabled: allowNeg),
         ]),
-        _section('Loans', [
+        _section('Loans', ['loans_enabled', 'max_loans_per_player'], [
           _switchTile('loans_enabled', 'Loans enabled',
               subtitle: 'Players can borrow from the bank'),
           _intTile('max_loans_per_player', 'Max loans per player',
               subtitle: 'Outstanding loan limit per player', enabled: loansEnabled),
         ]),
-        _section('Async Play', [
+        _section('Async Play', ['async_turn_timeout_hours', 'async_turn_reminder_hours'], [
           _nullIntTile('async_turn_timeout_hours', 'Turn timeout', 'No expiry',
               subtitle: 'Hours before idle turn is skipped'),
           _nullIntTile('async_turn_reminder_hours', 'Reminder before expiry', 'No reminder',

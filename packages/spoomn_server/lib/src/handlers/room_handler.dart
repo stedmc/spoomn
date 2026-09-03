@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:shelf/shelf.dart';
-import 'package:shelf_router/shelf_router.dart' show params;
+import 'package:shelf_router/shelf_router.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../db/supabase_client.dart';
@@ -42,7 +42,7 @@ Future<Response> createRoom(Request request, String playerId) async {
 }
 
 Future<Response> joinRoom(Request request, String playerId) async {
-  final roomCode = params(request, 'roomCode')!;
+  final roomCode = request.params['roomCode']!;
 
   final room = await supabase
       .from('game_rooms')
@@ -88,7 +88,7 @@ Future<Response> joinRoom(Request request, String playerId) async {
 }
 
 Future<Response> rejoinRoom(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
   final deviceToken = body['device_token'] as String?;
 
@@ -142,7 +142,7 @@ Future<Response> rejoinRoom(Request request, String playerId) async {
 }
 
 Future<Response> startRoom(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
 
   final room = await supabase
       .from('game_rooms')
@@ -172,7 +172,7 @@ Future<Response> startRoom(Request request, String playerId) async {
 }
 
 Future<Response> beginGame(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
 
   final room = await supabase
       .from('game_rooms')
@@ -297,7 +297,7 @@ List<Map<String, dynamic>> _assignSeatOrder(
 }
 
 Future<Response> pauseRoom(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   await supabase.from('game_rooms').update({
     'status': 'paused',
     'paused_at': DateTime.now().toIso8601String(),
@@ -306,7 +306,7 @@ Future<Response> pauseRoom(Request request, String playerId) async {
 }
 
 Future<Response> resumeRoom(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   await supabase.from('game_rooms').update({
     'status': 'active',
     'paused_at': null,
@@ -315,7 +315,7 @@ Future<Response> resumeRoom(Request request, String playerId) async {
 }
 
 Future<Response> connectPlayer(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   await supabase
       .from('room_players')
       .update({'is_connected': true})
@@ -325,7 +325,7 @@ Future<Response> connectPlayer(Request request, String playerId) async {
 }
 
 Future<Response> disconnectPlayer(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   await supabase
       .from('room_players')
       .update({'is_connected': false})
@@ -355,7 +355,7 @@ Future<Response> updatePushToken(Request request, String playerId) async {
 }
 
 Future<Response> debugAddPlayer(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
 
   final room = await supabase
       .from('game_rooms')
@@ -419,7 +419,7 @@ Future<Response> debugAddPlayer(Request request, String playerId) async {
 }
 
 Future<Response> removePlayer(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
   final targetPlayerId = body['player_id'] as String?;
 
@@ -469,7 +469,7 @@ Future<Response> removePlayer(Request request, String playerId) async {
 }
 
 Future<Response> updateRoomConfig(Request request, String playerId) async {
-  final roomId = params(request, 'roomId')!;
+  final roomId = request.params['roomId']!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
 
   final room = await supabase

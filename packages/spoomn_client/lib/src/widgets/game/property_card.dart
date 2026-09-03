@@ -176,7 +176,7 @@ class _GameDebugAssignCardState extends ConsumerState<GameDebugAssignCard> {
         {'square': widget.squareIndex, 'player_id': _selected},
       );
     } on GameServiceException catch (e) {
-      if (context.mounted) {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
       }
     }

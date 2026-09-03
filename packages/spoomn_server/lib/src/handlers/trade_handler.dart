@@ -39,7 +39,7 @@ Future<Response> proposeTrade(
   final multiParty = config['multi_party_trades'] as bool? ?? false;
   if (!multiParty && participants.length > 2) {
     return errorJson(400, 'RULE_VIOLATION',
-        'Multi-party trades not enabled — max 2 participants');
+        'Multi-party trades not enabled — max 2 participants',);
   }
 
   // Validate proposer owns everything they're offering
@@ -62,16 +62,16 @@ Future<Response> proposeTrade(
     for (final prop in properties) {
       if (ownership['$prop'] != from) {
         return errorJson(400, 'NOT_OWNER',
-            'Player $from does not own property $prop');
+            'Player $from does not own property $prop',);
       }
     }
     if (money > 0 && ((balances[from] as int?) ?? 0) < money) {
       return errorJson(400, 'INSUFFICIENT_FUNDS',
-          'Player $from cannot afford £$money in this trade');
+          'Player $from cannot afford £$money in this trade',);
     }
     if (jailCards > 0 && ((goojfCards[from] as int?) ?? 0) < jailCards) {
       return errorJson(400, 'RULE_VIOLATION',
-          'Player $from does not have $jailCards GOOJF card(s)');
+          'Player $from does not have $jailCards GOOJF card(s)',);
     }
   }
 
@@ -96,7 +96,7 @@ Future<Response> proposeTrade(
         final conflict = lp.any((p) => ep.contains(p));
         if (conflict) {
           return errorJson(400, 'ASSET_COMMITTED',
-              'A property in this trade is already in a pending trade');
+              'A property in this trade is already in a pending trade',);
         }
       }
     }
@@ -113,7 +113,7 @@ Future<Response> proposeTrade(
 
   if (writeLog) {
     await _writeLog(roomId, playerId, stateRow['turn_number'] as int, 'propose_trade',
-        {'participants': participants, 'legs': legs});
+        {'participants': participants, 'legs': legs},);
   }
 
   return okJson({'proposed': true});
@@ -172,13 +172,13 @@ Future<Response> acceptTrade(
 
   // Re-validate all assets still owned
   final ownership = Map<String, dynamic>.from(
-      stateRow['property_ownership'] as Map<String, dynamic>);
+      stateRow['property_ownership'] as Map<String, dynamic>,);
   final balances = Map<String, dynamic>.from(
-      stateRow['balances'] as Map<String, dynamic>);
+      stateRow['balances'] as Map<String, dynamic>,);
   final goojfCards = Map<String, dynamic>.from(
-      stateRow['get_out_of_jail_cards'] as Map<String, dynamic>);
+      stateRow['get_out_of_jail_cards'] as Map<String, dynamic>,);
   final rentModifiers = Map<String, dynamic>.from(
-      stateRow['rent_modifiers'] as Map<String, dynamic>);
+      stateRow['rent_modifiers'] as Map<String, dynamic>,);
 
   for (final leg in legs) {
     final from = leg['from'] as String;
@@ -193,7 +193,7 @@ Future<Response> acceptTrade(
           'resolved_at': DateTime.now().toIso8601String(),
         }).eq('id', tradeId);
         return errorJson(400, 'ASSET_INVALID',
-            'Property $prop is no longer owned by $from — trade cancelled');
+            'Property $prop is no longer owned by $from — trade cancelled',);
       }
     }
     if (money > 0 && ((balances[from] as int?) ?? 0) < money) {
@@ -202,7 +202,7 @@ Future<Response> acceptTrade(
         'resolved_at': DateTime.now().toIso8601String(),
       }).eq('id', tradeId);
       return errorJson(400, 'INSUFFICIENT_FUNDS',
-          'Player $from can no longer afford trade — cancelled');
+          'Player $from can no longer afford trade — cancelled',);
     }
     if (jailCards > 0 && ((goojfCards[from] as int?) ?? 0) < jailCards) {
       await supabase.from('pending_trades').update({
@@ -210,7 +210,7 @@ Future<Response> acceptTrade(
         'resolved_at': DateTime.now().toIso8601String(),
       }).eq('id', tradeId);
       return errorJson(400, 'ASSET_INVALID',
-          'Player $from no longer has $jailCards GOOJF card(s) — cancelled');
+          'Player $from no longer has $jailCards GOOJF card(s) — cancelled',);
     }
   }
 
@@ -240,7 +240,7 @@ Future<Response> acceptTrade(
     if (immunityTurns > 0) {
       final toMods = Map<String, dynamic>.from(
           (rentModifiers[to] as Map<String, dynamic>?) ??
-              {'protections': [], 'discounts': []});
+              {'protections': [], 'discounts': []},);
       final protections = List<dynamic>.from(toMods['protections'] as List? ?? []);
       protections.add({
         'type': 'rent_protection',
@@ -323,7 +323,7 @@ Future<Response> counterTrade(
 
   // Propose counter as new trade, excluding the countered trade from conflict checks
   return proposeTrade(roomId, playerId, payload['counter'] as Map<String, dynamic>, config,
-      excludeTradeId: tradeId, writeLog: false);
+      excludeTradeId: tradeId, writeLog: false,);
 }
 
 Future<Response> rejectTrade(
