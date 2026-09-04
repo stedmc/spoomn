@@ -75,6 +75,7 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   String? _hoveredPlayerId;
   bool _highlightLocked = false;
   Timer? _lockTimer;
+  bool _gameLoaded = false;
 
   static const _colourPalette = [
     Color(0xFFE53935),
@@ -113,6 +114,37 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
       }
     };
     await add(dice);
+    _gameLoaded = true;
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    if (!_gameLoaded) return;
+    dice.position = Vector2(size.x * 0.5, size.y * 0.5);
+    _snapTokensToBoard();
+    _snapPolicePawnsToBoard();
+  }
+
+  void _snapTokensToBoard() {
+    final squarePlayers = <int, List<String>>{};
+    for (final entry in _tokens.entries) {
+      squarePlayers.putIfAbsent(entry.value.currentSquare, () => []).add(entry.key);
+    }
+    for (final list in squarePlayers.values) {
+      list.sort();
+    }
+    for (final entry in _tokens.entries) {
+      final sq = entry.value.currentSquare;
+      final slot = squarePlayers[sq]!.indexOf(entry.key);
+      entry.value.moveTo(sq, board: board, teleport: true, slot: slot);
+    }
+  }
+
+  void _snapPolicePawnsToBoard() {
+    for (final pawn in _policePawns.values) {
+      pawn.snapToBoard(board);
+    }
   }
 
   @override

@@ -12,8 +12,10 @@ class PolicePawnComponent extends CircleComponent {
         );
 
   final String ownerId;
+  int _currentSquare = 0;
 
   void moveTo(int squareIndex, {required BoardComponent board}) {
+    _currentSquare = squareIndex;
     final center = board.squareRects[squareIndex].center;
     final target = board.position + Vector2(center.dx, center.dy);
     add(
@@ -22,5 +24,11 @@ class PolicePawnComponent extends CircleComponent {
         EffectController(duration: 0.3, curve: Curves.easeIn),
       ),
     );
+  }
+
+  void snapToBoard(BoardComponent board) {
+    removeAll(children.whereType<Effect>().toList());
+    final center = board.squareRects[_currentSquare].center;
+    position = board.position + Vector2(center.dx, center.dy);
   }
 }

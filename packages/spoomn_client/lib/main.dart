@@ -1,3 +1,4 @@
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,12 +19,28 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
 
+  _listenDeepLinks();
+
   runApp(
     ProviderScope(
       overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: const SpoomnApp(),
     ),
   );
+}
+
+void _listenDeepLinks() {
+  AppLinks().uriLinkStream.listen((uri) {
+    // spoomn://join/CODE → host='join', path='/CODE' → router path '/join/CODE'
+    // https://spoomn.app/join/CODE → path='/join/CODE' → router path '/join/CODE'
+    String path;
+    if (uri.scheme == 'spoomn' && uri.host == 'join') {
+      path = '/join${uri.path}';
+    } else {
+      path = uri.path;
+    }
+    if (path.isNotEmpty) router.go(path);
+  });
 }
 
 Future<void> _initAnonymousSession() async {

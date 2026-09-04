@@ -1,9 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../services/game_service.dart';
+
+class _RoomCodeFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final chars = newValue.text.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+    final raw = chars.length > 6 ? chars.substring(0, 6) : chars;
+    final formatted = raw.length <= 3 ? raw : '${raw.substring(0, 3)} - ${raw.substring(3)}';
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -96,6 +113,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
   }
 
+  String _rawCode(String formatted) =>
+      formatted.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
   Future<void> _joinWithCode() async {
     final controller = TextEditingController();
     final code = await showDialog<String>(
@@ -106,13 +126,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           controller: controller,
           autofocus: true,
           textCapitalization: TextCapitalization.characters,
-          decoration: const InputDecoration(hintText: 'Room code (e.g. K7X2MQR9)'),
-          onSubmitted: (v) => Navigator.of(ctx).pop(v.trim().toUpperCase()),
+          inputFormatters: [_RoomCodeFormatter()],
+          decoration: const InputDecoration(hintText: 'e.g. K7X - 2MQ'),
+          onSubmitted: (v) => Navigator.of(ctx).pop(_rawCode(v)),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim().toUpperCase()),
+            onPressed: () => Navigator.of(ctx).pop(_rawCode(controller.text)),
             child: const Text('Join'),
           ),
         ],

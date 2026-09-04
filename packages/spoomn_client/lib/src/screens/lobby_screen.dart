@@ -116,6 +116,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   bool? _pendingDebugMode;
   bool _addingBot = false;
   bool _didInitDebug = false;
+  final Map<String, String> _localNameOverrides = {};
 
   @override
   void initState() {
@@ -196,6 +197,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     if (newName == null || newName.isEmpty) return;
     final userId = ref.read(currentUserIdProvider);
     if (userId == null) return;
+    setState(() => _localNameOverrides[userId] = newName);
     await Supabase.instance.client
         .from('profiles')
         .update({'display_name': newName})
@@ -229,6 +231,19 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     );
   }
 
+  static const _deepLinkBase = String.fromEnvironment(
+    'DEEP_LINK_BASE_URL',
+    defaultValue: 'spoomn://join',
+  );
+
+  void _copyInviteLink(String code) {
+    final link = '$_deepLinkBase/$code';
+    Clipboard.setData(ClipboardData(text: link));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Invite link copied'), duration: Duration(seconds: 2)),
+    );
+  }
+
   Widget _buildPlayersList(
     List<RoomPlayer> players,
     String? myId,
@@ -256,7 +271,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               size: 18,
             ),
           ),
-          title: Text(p.displayName ?? 'Guest', style: const TextStyle(fontSize: 13)),
+          title: Text(_localNameOverrides[p.playerId] ?? p.displayName ?? 'Guest', style: const TextStyle(fontSize: 13)),
           subtitle: Text(
             p.isConnected ? 'Connected' : 'Disconnected',
             style: const TextStyle(fontSize: 11),
@@ -399,6 +414,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                     icon: const Icon(Icons.copy, size: 18),
                     tooltip: 'Copy room code',
                     onPressed: () => _copyRoomCode(room.roomCode),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.link, size: 18),
+                    tooltip: 'Copy invite link',
+                    onPressed: () => _copyInviteLink(room.roomCode),
                   ),
                 ],
               ),

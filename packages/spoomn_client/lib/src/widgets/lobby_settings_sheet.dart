@@ -456,6 +456,17 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     final allowNeg = _config['allow_bankruptcy_negotiation'] as bool? ?? false;
     final loansEnabled = _config['loans_enabled'] as bool? ?? false;
 
+    ref.listen(roomConfigProvider(widget.roomId), (_, next) {
+      if (!_loaded && next.value != null && mounted) {
+        setState(() {
+          _config = Map<String, dynamic>.from(next.value!);
+          _loaded = true;
+        });
+        ref.read(draftRoomConfigProvider(widget.roomId).notifier).state =
+            Map<String, dynamic>.from(next.value!);
+      }
+    });
+
     ref.listen(resetConfigKeyProvider(widget.roomId), (_, key) {
       if (key != null && mounted) {
         _resetKey(key);

@@ -119,14 +119,20 @@ Stream<List<ActiveTrap>> activeTraps(Ref ref, String roomId) {
 // ---------------------------------------------------------------------------
 
 final roomConfigProvider = StreamProvider.family<Map<String, dynamic>?, String>((ref, roomId) async* {
+  // Always yield from the REST fetch so the UI never gets stuck on a spinner
+  // while waiting for the realtime stream's first event. If the row doesn't
+  // exist yet (race during room creation), yield an empty map so default rules
+  // are displayed immediately.
   try {
     final row = await Supabase.instance.client
         .from('room_configs')
         .select()
         .eq('room_id', roomId)
         .maybeSingle();
-    if (row != null) yield row;
-  } catch (_) {}
+    yield row ?? {};
+  } catch (_) {
+    yield {};
+  }
   yield* Supabase.instance.client
       .from('room_configs')
       .stream(primaryKey: ['room_id'])

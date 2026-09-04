@@ -19,13 +19,22 @@ class BoardComponent extends PositionComponent with HasGameReference {
 
   @override
   Future<void> onLoad() async {
-    final boardWidth = game.size.x < game.size.y
-        ? game.size.x
-        : game.size.y;
+    _applySize(game.size);
+  }
+
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    if (!isMounted) return;
+    _applySize(size);
+  }
+
+  void _applySize(Vector2 gameSize) {
+    final boardWidth = gameSize.x < gameSize.y ? gameSize.x : gameSize.y;
     size = Vector2.all(boardWidth);
     position = Vector2(
-      (game.size.x - boardWidth) / 2,
-      (game.size.y - boardWidth) / 2,
+      (gameSize.x - boardWidth) / 2,
+      (gameSize.y - boardWidth) / 2,
     );
     squareRects = _computeSquareRects(boardWidth);
   }
