@@ -115,7 +115,8 @@ jobs:
         run: |
           flutter build web --release \
             --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
-            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=SERVER_URL=https://spoomn.fly.dev
         working-directory: packages/spoomn_client
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
