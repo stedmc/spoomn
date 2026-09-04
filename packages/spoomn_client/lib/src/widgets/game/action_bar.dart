@@ -65,6 +65,10 @@ class GameActionBar extends ConsumerWidget {
         diceRoll.length >= 2 &&
         diceRoll.every((d) => d == diceRoll[0]) &&
         (stateAsync.value?.consecutiveDoubles ?? 0) > 0;
+    final warmupLaps = (config?['warmup_laps'] as int?) ?? 0;
+    final effectivePlayerId = debugActingAs ?? ref.watch(currentUserIdProvider) ?? '';
+    final playerLaps = stateAsync.value?.lapsCompleted[effectivePlayerId] ?? 0;
+    final inWarmup = warmupLaps > 0 && playerLaps < warmupLaps;
 
     return Container(
       color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
@@ -134,20 +138,35 @@ class GameActionBar extends ConsumerWidget {
               ),
             ],
           ),
-        GamePhaseName.action when pending == GamePendingType.purchaseDecision => Row(
+        GamePhaseName.action when pending == GamePendingType.purchaseDecision => Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => _act(context, ref, GameAction.buyProperty),
-                  child: const Text('Buy'),
+              if (inWarmup)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    'Warm-up laps: $playerLaps/$warmupLaps -- buying unlocks after',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => _act(context, ref, GameAction.declineProperty),
-                  child: const Text('Decline'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: inWarmup
+                          ? null
+                          : () => _act(context, ref, GameAction.buyProperty),
+                      child: const Text('Buy'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => _act(context, ref, GameAction.declineProperty),
+                      child: const Text('Decline'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

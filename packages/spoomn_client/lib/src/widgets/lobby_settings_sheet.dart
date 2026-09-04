@@ -16,6 +16,7 @@ const Map<String, dynamic> kRoomConfigDefaults = {
   'house_limit': 32,
   'hotel_limit': 12,
   'turn_order_method': 'highest_roll',
+  'warmup_laps': 0,
   'dice_count': 2,
   'dice_sides': 6,
   'doubles_enabled': true,
@@ -510,10 +511,12 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
           _nullIntTile('jail_on_consecutive_doubles', 'Jail after N doubles', 'Never',
               subtitle: 'Go to jail after this many doubles in a row', enabled: doubles),
         ]),
-        _section('Movement & Go', ['go_salary', 'go_landing_bonus'], [
+        _section('Movement & Go', ['go_salary', 'go_landing_bonus', 'warmup_laps'], [
           _intTile('go_salary', 'Go salary', subtitle: 'Collect when passing Go'),
           _intTile('go_landing_bonus', 'Go landing bonus',
               subtitle: 'Extra cash for landing exactly on Go'),
+          _intTile('warmup_laps', 'Warm-up laps',
+              subtitle: 'Laps round the board before players can buy properties'),
         ]),
         _section('Rent', ['auto_claim_rent'], [
           _switchTile('auto_claim_rent', 'Auto-claim rent',

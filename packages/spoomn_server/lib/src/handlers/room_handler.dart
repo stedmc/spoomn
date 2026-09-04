@@ -226,6 +226,9 @@ Future<Response> beginGame(Request request, String playerId) async {
   final boardPositions = <String, dynamic>{
     for (final p in orderedPlayers) p['player_id'] as String: 0,
   };
+  final lapsCompleted = <String, dynamic>{
+    for (final p in orderedPlayers) p['player_id'] as String: 0,
+  };
   final jailStatus = <String, dynamic>{
     for (final p in orderedPlayers)
       p['player_id'] as String: {
@@ -257,6 +260,7 @@ Future<Response> beginGame(Request request, String playerId) async {
     'phase': 'roll',
     'consecutive_doubles': 0,
     'board_positions': boardPositions,
+    'laps_completed': lapsCompleted,
     'property_ownership': {},
     'houses': {},
     'hotels': {},

@@ -182,6 +182,12 @@ Future<Response> _rollDice(
   final passedGo = newPos < currentPos;
   positions[playerId] = newPos;
 
+  final lapsCompleted = Map<String, dynamic>.from(
+      state['laps_completed'] as Map<String, dynamic>? ?? {},);
+  if (passedGo) {
+    lapsCompleted[playerId] = ((lapsCompleted[playerId] as int?) ?? 0) + 1;
+  }
+
   final rentModifiers = _decrementRollProtections(
     Map<String, dynamic>.from(state['rent_modifiers'] as Map<String, dynamic>? ?? {}),
     playerId,
@@ -191,6 +197,7 @@ Future<Response> _rollDice(
     'dice_roll': roll,
     'consecutive_doubles': consecutiveDoubles,
     'board_positions': positions,
+    'laps_completed': lapsCompleted,
     'rent_modifiers': rentModifiers,
     'updated_at': DateTime.now().toIso8601String(),
   };
@@ -246,6 +253,16 @@ Future<Response> _buyProperty(
 
   if (square.price == null) {
     return errorJson(400, 'RULE_VIOLATION', 'Square is not purchasable');
+  }
+
+  final warmupLaps = (config['warmup_laps'] as int?) ?? 0;
+  if (warmupLaps > 0) {
+    final lapsCompleted = state['laps_completed'] as Map<String, dynamic>? ?? {};
+    final playerLaps = (lapsCompleted[playerId] as int?) ?? 0;
+    if (playerLaps < warmupLaps) {
+      return errorJson(400, 'RULE_VIOLATION',
+          'Still on warm-up laps ($playerLaps/$warmupLaps) -- cannot buy property yet',);
+    }
   }
 
   final ownership = state['property_ownership'] as Map<String, dynamic>;

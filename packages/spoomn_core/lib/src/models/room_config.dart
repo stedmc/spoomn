@@ -14,6 +14,7 @@ abstract class RoomConfig with _$RoomConfig {
     @Default(32) int? houseLimit,
     @Default(12) int? hotelLimit,
     @Default('highest_roll') String turnOrderMethod,
+    @Default(0) int warmupLaps,
     // Dice
     @Default(2) int diceCount,
     @Default(6) int diceSides,

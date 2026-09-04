@@ -44,6 +44,7 @@ abstract class GameState with _$GameState {
     List<int>? diceRoll,
     required int consecutiveDoubles,
     required Map<String, int> boardPositions,
+    required Map<String, int> lapsCompleted,
     required Map<String, String> propertyOwnership,
     required Map<String, int> houses,
     required Map<String, bool> hotels,
