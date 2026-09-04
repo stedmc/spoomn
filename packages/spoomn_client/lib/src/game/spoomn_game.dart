@@ -30,11 +30,15 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   bool _pendingDiceComplete = false;
   bool _pendingTokenComplete = false;
 
+  bool get pendingDiceComplete => _pendingDiceComplete;
+  bool get pendingTokenComplete => _pendingTokenComplete;
+
   VoidCallback? _onDiceAnimationComplete;
   VoidCallback? get onDiceAnimationComplete => _onDiceAnimationComplete;
   set onDiceAnimationComplete(VoidCallback? cb) {
     _onDiceAnimationComplete = cb;
     if (cb != null && _pendingDiceComplete) {
+      debugPrint('[ROLL] dice: pending flag consumed — firing immediately');
       _pendingDiceComplete = false;
       cb();
     }
@@ -45,6 +49,7 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   set onTokenAnimationComplete(VoidCallback? cb) {
     _onTokenAnimationComplete = cb;
     if (cb != null && _pendingTokenComplete) {
+      debugPrint('[ROLL] token: pending flag consumed — firing immediately');
       _pendingTokenComplete = false;
       cb();
     }
@@ -115,9 +120,11 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
 
     dice = DiceComponent()..position = Vector2(size.x * 0.5, size.y * 0.5);
     dice.onAnimationComplete = () {
+      debugPrint('[ROLL] dice animation complete — cb=${_onDiceAnimationComplete != null}');
       if (_onDiceAnimationComplete != null) {
         _onDiceAnimationComplete!();
       } else {
+        debugPrint('[ROLL] dice: no cb, setting pendingDiceComplete=true');
         _pendingDiceComplete = true;
       }
     };
@@ -277,6 +284,7 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   }
 
   void onStateUpdate(GameState state) {
+    debugPrint('[ROLL] onStateUpdate phase=${state.phase.name} pending=${state.pendingAction?['type']} positions=${state.boardPositions}');
     _propertyOwnership = state.propertyOwnership;
     _updateTokenPositions(state.boardPositions, state.jailStatus);
     _updatePolicePawns(state.activePolicePawns);
@@ -308,9 +316,11 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   }
 
   void _onAnyTokenMoveComplete() {
+    debugPrint('[ROLL] token move complete — cb=${_onTokenAnimationComplete != null} pendingAlready=$_pendingTokenComplete');
     if (_onTokenAnimationComplete != null) {
       _onTokenAnimationComplete!();
     } else {
+      debugPrint('[ROLL] token: no cb, setting pendingTokenComplete=true');
       _pendingTokenComplete = true;
     }
   }

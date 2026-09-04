@@ -102,7 +102,11 @@ class _GameSidePanelState extends ConsumerState<GameSidePanel> {
           const Divider(height: 1),
           Expanded(child: GameActivityLog(roomId: widget.roomId)),
           PersistentCardWidget(roomId: widget.roomId),
-          if ((isDebug || (isMyTurn && phase != GamePhaseName.auction) || isMyAuctionTurn) && !widget.isAnimating) ...[
+          if (() {
+            final show = (isDebug || (isMyTurn && phase != GamePhaseName.auction) || isMyAuctionTurn) && !widget.isAnimating;
+            debugPrint('[ROLL] actionBar: isDebug=$isDebug isMyTurn=$isMyTurn phase=$phase isAnimating=${widget.isAnimating} → show=$show');
+            return show;
+          }()) ...[
             const Divider(height: 1),
             if (phase == null)
               const Padding(

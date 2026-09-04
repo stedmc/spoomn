@@ -4,6 +4,7 @@ import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
 
+
 import 'board_component.dart';
 
 class TokenComponent extends CircleComponent {
@@ -68,6 +69,7 @@ class TokenComponent extends CircleComponent {
     bool forward = true,
   }) {
     if (_positioned && squareIndex == currentSquare && slot == _currentSlot && !teleport) {
+      debugPrint('[ROLL] token $playerId moveTo=$squareIndex slot=$slot → SKIP (already there, same slot)');
       return;
     }
 
@@ -80,6 +82,7 @@ class TokenComponent extends CircleComponent {
 
     // Teleport, initial placement, or same-square slot change: snap directly.
     if (teleport || !_positioned || squareIndex == currentSquare) {
+      debugPrint('[ROLL] token $playerId moveTo=$squareIndex slot=$slot → SNAP (teleport=$teleport positioned=$_positioned sameSquare=${squareIndex == currentSquare} slotChange=${slot != _currentSlot})');
       position = destTarget;
       currentSquare = squareIndex;
       _currentSlot = slot;
@@ -112,14 +115,20 @@ class TokenComponent extends CircleComponent {
       effects.add(MoveEffect.to(target, EffectController(duration: 0.12)));
     }
 
+    print('[ROLL] token $playerId moveTo=$squareIndex slot=$slot → ANIMATE ${steps.length} steps from $currentSquare');
     if (effects.isNotEmpty) {
       add(SequenceEffect(effects));
       add(TimerComponent(
         period: steps.length * 0.12 + 0.05,
         repeat: false,
         removeOnFinish: true,
-        onTick: () => onMoveComplete?.call(),
+        onTick: () {
+          debugPrint('[ROLL] token $playerId TimerComponent fired → calling onMoveComplete (cb=${onMoveComplete != null})');
+          onMoveComplete?.call();
+        },
       ));
+    } else {
+      debugPrint('[ROLL] token $playerId no effects added (steps empty?) → onMoveComplete will NOT fire');
     }
     currentSquare = squareIndex;
     _currentSlot = slot;

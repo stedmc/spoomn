@@ -131,7 +131,10 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
   @override
   Widget build(BuildContext context) {
     ref.listen(gameStateProvider(widget.roomId), (_, next) {
-      next.whenData(_game.onStateUpdate);
+      next.whenData((state) {
+        debugPrint('[ROLL] gameState fired: phase=${state.phase.name} pending=${state.pendingAction?['type']} isAnimating=$_isAnimating');
+        _game.onStateUpdate(state);
+      });
     });
     ref.listen(gameLogProvider(widget.roomId), (_, next) {
       next.whenData((entries) {
@@ -141,6 +144,9 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
 
         debugPrint('[GameLog] action=${top['action']} id=$id');
 
+        if (top['action'] == GameAction.rollDice) {
+          debugPrint('[ROLL] log: rollDice id=$id lastId=$_lastRollEntryId isAnimating=$_isAnimating');
+        }
         if (top['action'] == GameAction.rollDice && !_isAnimating && id != _lastRollEntryId) {
           _lastRollEntryId = id;
           _beginRollSequence(top);
@@ -184,6 +190,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
         }
         if (prevRoom?.currentPlayerId != null &&
             prevRoom?.currentPlayerId != room.currentPlayerId) {
+          debugPrint('[ROLL] currentPlayerId changed ${prevRoom?.currentPlayerId} → ${room.currentPlayerId} — force clearing _isAnimating');
           _cardDismissTimer?.cancel();
           setState(() {
             _showCardDraw = false;
@@ -363,6 +370,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
         payload['sent_to_jail'] == true ||
         payload['mandatory_turns_remaining'] != null;
 
+    debugPrint('[ROLL] _beginRollSequence noTokenMove=$noTokenMove pendingDice=${_game.pendingDiceComplete} pendingToken=${_game.pendingTokenComplete}');
+
     _sequenceTimer?.cancel();
     setState(() {
       _isAnimating = true;
@@ -374,6 +383,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     _game.onDiceAnimationComplete = () {
       _game.onDiceAnimationComplete = null;
       if (!mounted) return;
+      debugPrint('[ROLL] diceComplete callback fired');
       setState(() => _movePhase = _MovePhase.tokenMoving);
       _diceComplete = true;
       _checkAnimationsComplete();
@@ -383,6 +393,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
       _game.onTokenAnimationComplete = () {
         _game.onTokenAnimationComplete = null;
         if (!mounted) return;
+        debugPrint('[ROLL] tokenComplete callback fired');
         _tokenComplete = true;
         _checkAnimationsComplete();
       };
@@ -390,8 +401,10 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
   }
 
   void _checkAnimationsComplete() {
+    debugPrint('[ROLL] _checkAnimationsComplete dice=$_diceComplete token=$_tokenComplete showCardDraw=$_showCardDraw');
     if (!_diceComplete || !_tokenComplete) return;
     if (!_showCardDraw) {
+      debugPrint('[ROLL] → clearing _isAnimating=false');
       setState(() {
         _isAnimating = false;
         _movePhase = _MovePhase.idle;
