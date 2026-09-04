@@ -115,7 +115,7 @@ class TokenComponent extends CircleComponent {
       effects.add(MoveEffect.to(target, EffectController(duration: 0.12)));
     }
 
-    print('[ROLL] token $playerId moveTo=$squareIndex slot=$slot → ANIMATE ${steps.length} steps from $currentSquare');
+    debugPrint('[ROLL] token $playerId moveTo=$squareIndex slot=$slot → ANIMATE ${steps.length} steps from $currentSquare');
     if (effects.isNotEmpty) {
       add(SequenceEffect(effects));
       add(TimerComponent(
