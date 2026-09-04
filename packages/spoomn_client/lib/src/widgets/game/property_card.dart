@@ -4,9 +4,9 @@ import 'package:spoomn_core/spoomn_core.dart';
 
 import '../../game/spoomn_game.dart';
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/game_service.dart';
 import 'game_constants.dart';
-import 'group_colour.dart';
 
 class GameSquareHoverCard extends ConsumerWidget {
   const GameSquareHoverCard({super.key, required this.roomId, required this.game});
@@ -183,7 +183,7 @@ class _GameDebugAssignCardState extends ConsumerState<GameDebugAssignCard> {
   }
 }
 
-class GamePropertyCard extends StatelessWidget {
+class GamePropertyCard extends ConsumerWidget {
   const GamePropertyCard({
     super.key,
     required this.square,
@@ -203,8 +203,8 @@ class GamePropertyCard extends StatelessWidget {
   final int? ownedUtilityCount;
 
   @override
-  Widget build(BuildContext context) {
-    final colour = groupColour(square.colourGroup);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colour = ref.watch(boardColorSchemeProvider).groupColour(square.colourGroup);
     final int? activeRentIndex =
         ownerName != null ? (hasHotel ? 5 : houseCount.clamp(0, 4)) : null;
 

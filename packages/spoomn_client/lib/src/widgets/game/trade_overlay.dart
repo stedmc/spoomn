@@ -6,9 +6,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 import '../../services/game_service.dart';
 import 'game_constants.dart';
-import 'group_colour.dart';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -140,7 +140,7 @@ class _ArrowPainter extends CustomPainter {
 
 // ─── Property card ────────────────────────────────────────────────────────────
 
-class _TradePropCard extends StatelessWidget {
+class _TradePropCard extends ConsumerWidget {
   const _TradePropCard({
     required this.boardIndex,
     required this.isMortgaged,
@@ -154,11 +154,12 @@ class _TradePropCard extends StatelessWidget {
   final bool isBeingDragged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (boardIndex < 0 || boardIndex >= Board.squares.length) {
       return const SizedBox(width: 96);
     }
     final sq = Board.squares[boardIndex];
+    final scheme = ref.watch(boardColorSchemeProvider);
 
     Color bandColor;
     IconData? bandIcon;
@@ -170,7 +171,7 @@ class _TradePropCard extends StatelessWidget {
         bandColor = Colors.teal.shade700;
         bandIcon  = sq.name.contains('Electric') ? Icons.bolt : Icons.water_drop;
       default:
-        bandColor = groupColour(sq.colourGroup) ?? Colors.grey;
+        bandColor = scheme.groupColour(sq.colourGroup) ?? Colors.grey;
         bandIcon  = null;
     }
 

@@ -25,6 +25,49 @@ create table public.profiles (
 - `id` mirrors `auth.users.id` -- Supabase Auth creates the `auth.users` row; we create the `profiles` row via trigger
 - `is_anonymous` flips to `false` when user upgrades to named account
 - `device_token` is a UUID generated client-side on first launch, stored in device secure storage, sent on anonymous session creation -- allows same-device rejoin even if the Supabase session expires
+- `avatar_url` / `pawn_photo_url` point at objects in the public `avatars` Storage bucket, uploaded from the profile screen; `pawn_photo_url` renders on the board in place of the flat colour token when set
+
+---
+
+### `player_stats`, `property_stats`, `trade_stats`
+
+Permanent per-profile stats, server-written only. Rolled up once per game, right after `game_rooms.status` becomes `'finished'` -- see `recordGameStats` in the server's `stats_handler.dart`.
+
+```sql
+create table public.player_stats (
+  profile_id            uuid primary key references public.profiles(id) on delete cascade,
+  games_played          int not null default 0,
+  wins                  int not null default 0,
+  losses                int not null default 0,
+  bankruptcies          int not null default 0,
+  avg_placement         numeric not null default 0,
+  peak_net_worth        int not null default 0,
+  properties_bought     int not null default 0,
+  monopolies_completed  int not null default 0,
+  jail_visits           int not null default 0,
+  tax_paid_total        int not null default 0,
+  fastest_win_turns     int,
+  updated_at            timestamptz not null default now()
+);
+
+-- Per (profile, board square) ownership counts -- drives "favourite property"
+create table public.property_stats (
+  profile_id   uuid not null references public.profiles(id) on delete cascade,
+  square_index int not null,
+  times_owned  int not null default 0,
+  primary key (profile_id, square_index)
+);
+
+-- Per (profile, partner) completed trade counts -- drives "favourite trading partner"
+create table public.trade_stats (
+  profile_id       uuid not null references public.profiles(id) on delete cascade,
+  partner_id       uuid not null references public.profiles(id) on delete cascade,
+  trades_completed int not null default 0,
+  primary key (profile_id, partner_id)
+);
+```
+
+`peak_net_worth` and `property_stats.times_owned` are computed from the game's *final* state, not tracked incrementally through the game -- cheap, and close enough for a stat rather than a ledger. `avg_placement` is a running average updated in place (`new = old + (placement - old) / games_played`), never recomputed from history.
 
 ---
 

@@ -2,6 +2,7 @@ import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
+import '../../providers/settings_provider.dart';
 import '../spoomn_game.dart';
 
 class BoardComponent extends PositionComponent with HasGameReference {
@@ -54,8 +55,10 @@ class BoardComponent extends PositionComponent with HasGameReference {
     return null;
   }
 
+  BoardColorScheme get _scheme => (game as SpoomnGame).colorScheme;
+
   void _drawSquare(Canvas canvas, int index, Rect rect, BoardSquare square) {
-    canvas.drawRect(rect, Paint()..color = const Color(0xFFCEE3CE));
+    canvas.drawRect(rect, Paint()..color = _scheme.boardBackground);
 
     if (square.colourGroup != null) {
       final bandSize = rect.shortestSide * 0.28;
@@ -77,7 +80,7 @@ class BoardComponent extends PositionComponent with HasGameReference {
         band = Rect.zero;
       }
       if (band != Rect.zero) {
-        canvas.drawRect(band, Paint()..color = _groupColour(square.colourGroup!));
+        canvas.drawRect(band, Paint()..color = _scheme.groupColour(square.colourGroup!) ?? Colors.grey);
       }
     }
 
@@ -155,7 +158,7 @@ class BoardComponent extends PositionComponent with HasGameReference {
         center = Offset(rect.center.dx, rect.top + bandSize / 2);
       }
       final hotelRect = Rect.fromCenter(center: center, width: 7, height: 5);
-      canvas.drawRect(hotelRect, Paint()..color = const Color(0xFFCC0000));
+      canvas.drawRect(hotelRect, Paint()..color = _scheme.hotel);
       canvas.drawRect(hotelRect, Paint()
         ..color = Colors.white
         ..style = PaintingStyle.stroke
@@ -173,7 +176,7 @@ class BoardComponent extends PositionComponent with HasGameReference {
           center = Offset(rect.left + spacing / 2 + h * spacing, rect.top + bandSize / 2);
         }
         final houseRect = Rect.fromCenter(center: center, width: dotSize, height: dotSize);
-        canvas.drawRect(houseRect, Paint()..color = const Color(0xFF228B22));
+        canvas.drawRect(houseRect, Paint()..color = _scheme.house);
         canvas.drawRect(houseRect, Paint()
           ..color = Colors.white
           ..style = PaintingStyle.stroke
@@ -225,7 +228,7 @@ class BoardComponent extends PositionComponent with HasGameReference {
         text: TextSpan(
           text: '£$freeParkingPot',
           style: TextStyle(
-            color: const Color(0xFFDAA520),
+            color: _scheme.freeParkingText,
             fontSize: fontSize * 1.1,
             fontWeight: FontWeight.bold,
           ),
@@ -301,30 +304,18 @@ class BoardComponent extends PositionComponent with HasGameReference {
     // Community Chest: upper-left quadrant of center
     drawPile(
       Offset(cx - size.x * 0.17, cy - size.y * 0.12),
-      const Color(0xFFFFF9E6),
-      const Color(0xFFC87800),
+      _scheme.communityChestFace,
+      _scheme.communityChestLabel,
       'COMMUNITY\nCHEST',
     );
     // Chance: upper-right quadrant of center
     drawPile(
       Offset(cx + size.x * 0.17, cy - size.y * 0.12),
-      const Color(0xFFFFECEC),
-      const Color(0xFFCC2200),
+      _scheme.chanceFace,
+      _scheme.chanceLabel,
       'CHANCE',
     );
   }
-
-  Color _groupColour(String group) => switch (group) {
-        'brown'     => const Color(0xFF955436),
-        'lightBlue' => const Color(0xFFAAE0FA),
-        'pink'      => const Color(0xFFD93A96),
-        'orange'    => const Color(0xFFF7941D),
-        'red'       => const Color(0xFFED1B24),
-        'yellow'    => const Color(0xFFFEF200),
-        'green'     => const Color(0xFF1FB25A),
-        'darkBlue'  => const Color(0xFF0072BB),
-        _           => Colors.grey,
-      };
 
   List<Rect> _computeSquareRects(double boardWidth) {
     final cornerSize = boardWidth / _totalPerSide;

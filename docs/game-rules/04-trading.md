@@ -51,6 +51,7 @@ Server validates the trade is balanced (every item given has a corresponding rec
 | Money | Always | Cannot trade more than current balance |
 | Get Out of Jail Free cards | Always | |
 | Future rent immunity | Configurable | See below |
+| Loans | Configurable | See below |
 | Buildings (houses/hotels) | Never | Buildings cannot be transferred directly; must be sold to bank first |
 
 ### Future Rent Immunity
@@ -74,6 +75,73 @@ Immunity terms stored on `game_state` and enforced by the server on each landing
   ]
 }
 ```
+
+### Loans
+
+| Config key | Default | Notes |
+|------------|---------|-------|
+| `trade_loans_enabled` | false | If true, players may include loans in trade legs |
+
+When enabled, a player may lend money to another player as part of a trade. The lender specifies the terms; the borrower receives cash immediately and repays in fixed instalments deducted automatically at the end of each of their turns.
+
+Loan terms set per trade leg -- there are no global fixed amounts:
+
+```json
+{
+  "from": "lender-player-id",
+  "to": "borrower-player-id",
+  "loan": {
+    "principal": 200,
+    "interest_rate": 0.1,
+    "num_repayments": 4
+  }
+}
+```
+
+**Repayment calculation (flat interest):**
+
+```
+total_repayment = principal × (1 + interest_rate)
+instalment      = ceil(total_repayment / num_repayments)
+final instalment = total_remaining (may be less than instalment if total does not divide evenly)
+```
+
+Example: principal 200, interest 10%, 4 repayments → total 220 → 55 per turn.
+
+On trade execution: lender's balance decreases by `principal`; borrower's increases by `principal`. A loan record is written to `game_state.player_loans`. The lender must have sufficient balance at the time of trade execution.
+
+**Net worth impact:**
+
+- Lender: remaining receivable added to net worth
+- Borrower: remaining debt subtracted from net worth
+
+**Loan state:**
+
+```json
+{
+  "player_loans": [
+    {
+      "loan_id": "uuid",
+      "lender_id": "player-uuid-a",
+      "borrower_id": "player-uuid-b",
+      "instalment_amount": 55,
+      "instalments_remaining": 4,
+      "total_remaining": 220,
+      "created_turn": 5
+    }
+  ]
+}
+```
+
+**Missed instalment:** at end of borrower's turn, if balance is insufficient after voluntary liquidation, the server auto-liquidates remaining assets. If still insufficient: bankruptcy declared, with the outstanding loan balance treated as the bankruptcy debt.
+
+**Lender bankruptcy:** the loan receivable is an asset and transfers with the lender's other assets per `bankruptcy_assets_to`. If assets go to `bank`, the loan is forgiven and the borrower's obligation cleared. If assets go to a creditor player, that player becomes the new lender and receives future instalments.
+
+**Constraints:**
+
+- Loan receivables are non-transferable -- a lender cannot include an existing receivable in a subsequent trade.
+- Loans cannot be taken from the bank. Player-to-player only.
+- A player may hold multiple outstanding loans simultaneously as lender, borrower, or both.
 
 ---
 

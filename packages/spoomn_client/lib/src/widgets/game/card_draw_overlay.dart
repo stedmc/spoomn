@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CardDrawOverlay extends StatefulWidget {
+import '../../providers/settings_provider.dart';
+
+class CardDrawOverlay extends ConsumerStatefulWidget {
   const CardDrawOverlay({
     super.key,
     required this.entry,
@@ -11,10 +14,10 @@ class CardDrawOverlay extends StatefulWidget {
   final VoidCallback onDismiss;
 
   @override
-  State<CardDrawOverlay> createState() => _CardDrawOverlayState();
+  ConsumerState<CardDrawOverlay> createState() => _CardDrawOverlayState();
 }
 
-class _CardDrawOverlayState extends State<CardDrawOverlay>
+class _CardDrawOverlayState extends ConsumerState<CardDrawOverlay>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _scale;
@@ -49,8 +52,9 @@ class _CardDrawOverlayState extends State<CardDrawOverlay>
     final deck = payload['deck'] as String? ?? '';
     final label = payload['label'] as String? ?? payload['card_id'] as String? ?? 'Card';
     final isChance = deck.contains('chance');
-    final faceColor = isChance ? const Color(0xFFFF6B6B) : const Color(0xFFF4A435);
-    final bgColor = isChance ? const Color(0xFFFFECEC) : const Color(0xFFFFF9E6);
+    final scheme = ref.watch(boardColorSchemeProvider);
+    final faceColor = isChance ? scheme.chanceLabel : scheme.communityChestLabel;
+    final bgColor = isChance ? scheme.chanceFace : scheme.communityChestFace;
     final deckLabel = isChance ? 'CHANCE' : 'COMMUNITY CHEST';
 
     return GestureDetector(

@@ -149,6 +149,7 @@ All keys ignored when `jailbreak_enabled` is false.
 | `trade_any_turn` | `false` | bool | If true, trades can be proposed and accepted at any time |
 | `multi_party_trades` | `false` | bool | If true, trades may involve any number of players |
 | `trade_futures` | `false` | bool | If true, future rent immunity can be included in trades |
+| `trade_loans_enabled` | `false` | bool | If true, players may include player-to-player loans in trades |
 | `trade_timeout_secs` | `null` | int\|null | Seconds before a pending trade auto-cancels; null = no timeout |
 
 ---
@@ -189,14 +190,11 @@ See [Cards and Spaces][cards] for card schema and effect types.
 
 ## Loans
 
-All keys ignored when `loans_enabled` is false.
-
 | Key | Default | Type | Notes |
 |-----|---------|------|-------|
-| `loans_enabled` | `false` | bool | Enables player borrowing from the bank |
-| `loan_amount` | `200` | int | Fixed amount per loan request |
-| `loan_interest_rate` | `0.1` | float | Interest charged per full turn while loan outstanding |
-| `max_loans_per_player` | `3` | int | Maximum simultaneous outstanding loans per player |
+| `trade_loans_enabled` | `false` | bool | Enables player-to-player loans as a trade asset; loan terms set per trade |
+
+See [Trading][trading] for loan mechanics, repayment calculation, and state schema.
 
 ---
 
@@ -221,8 +219,9 @@ Common presets for reference. These are not built-in modes -- set the individual
 | **Speed game** | `turn_limit: 20`, `starting_money: 2000`, `auction_on_decline: true`, `auto_claim_rent: true` |
 | **Chaos mode** | `jailbreak_enabled: true`, `multi_party_trades: true`, `trade_futures: true`, `trade_any_turn: true`, `custom_community_chest: [...]`, `custom_chance: [...]` |
 | **Classic strict** | `must_build_evenly: true`, `hotel_requires_four_houses: true`, `auction_on_decline: true`, `bankruptcy_assets_to: "creditor"`, `auto_claim_rent: false` |
-| **Forgiving** | `allow_bankruptcy_negotiation: true`, `loans_enabled: true`, `bank_unlimited: true`, `jail_doubles_escape: true` |
+| **Forgiving** | `allow_bankruptcy_negotiation: true`, `trade_loans_enabled: true`, `bank_unlimited: true`, `jail_doubles_escape: true` |
 
 ---
 
 [cards]: ./05-cards-and-spaces.md
+[trading]: ./04-trading.md

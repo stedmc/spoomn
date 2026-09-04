@@ -77,6 +77,7 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
       });
     final state = ref.watch(gameStateProvider(widget.roomId)).value;
     final room = ref.watch(gameRoomProvider(widget.roomId)).value;
+    final onlineIds = ref.watch(onlinePlayerIdsProvider(widget.roomId)).value;
 
     ref.listen(gameStateProvider(widget.roomId), (prev, next) {
       if (prev == null) return;
@@ -114,6 +115,7 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
             final isGameHovered = hoveredPlayerId == p.playerId;
             final delta = _balanceDeltas[p.playerId];
             final playerColour = widget.game.playerColours[p.playerId] ?? Colors.grey;
+            final isOnline = onlineIds?.contains(p.playerId) ?? p.isConnected;
 
             return MouseRegion(
               onEnter: (_) => widget.game.setHoveredPlayer(p.playerId),
@@ -137,16 +139,40 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
                           : const SizedBox(width: 14),
                     ),
                     const SizedBox(width: 2),
-                    Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: playerColour,
-                        border: Border.all(
-                          color: p.isConnected ? Colors.white54 : Colors.grey.shade600,
-                          width: 1.5,
-                        ),
+                    Tooltip(
+                      message: isOnline ? 'Online' : 'Offline',
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 14,
+                            height: 14,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: playerColour,
+                              border: Border.all(
+                                color: isOnline ? Colors.white54 : Colors.grey.shade600,
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: -2,
+                            bottom: -2,
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isOnline ? Colors.greenAccent : Colors.grey.shade600,
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.surface,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],

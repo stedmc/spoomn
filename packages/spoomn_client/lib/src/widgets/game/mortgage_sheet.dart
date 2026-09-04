@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 import 'game_constants.dart';
-import 'group_colour.dart';
 
 class GameMortgageSheet extends ConsumerWidget {
   const GameMortgageSheet({
@@ -30,6 +30,7 @@ class GameMortgageSheet extends ConsumerWidget {
       ..sort();
 
     final colorScheme = Theme.of(context).colorScheme;
+    final scheme = ref.watch(boardColorSchemeProvider);
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -46,7 +47,7 @@ class GameMortgageSheet extends ConsumerWidget {
           ),
         ...owned.map((idx) {
           final sq = Board.squares[idx];
-          final colour = groupColour(sq.colourGroup);
+          final colour = scheme.groupColour(sq.colourGroup);
           final isMortgaged = state.mortgaged.contains(idx);
 
           return Card(

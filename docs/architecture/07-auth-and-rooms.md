@@ -44,9 +44,24 @@ await Supabase.instance.client.auth.updateUser(
 
 // Google OAuth
 await Supabase.instance.client.auth.signInWithOAuth(OAuthProvider.google);
+
+// Email + password
+await Supabase.instance.client.auth.updateUser(
+  UserAttributes(email: email, password: password),
+);
 ```
 
 After upgrade: `profiles.is_anonymous` set to `false`. Cross-device rejoin now works via `auth.uid()` rather than `device_token`.
+
+A player who already has a named account on another device signs in normally
+(`signOut()` then `signInWithPassword`) rather than upgrading -- this switches
+`auth.uid()` to the existing account, leaving the current device's anonymous
+session (and its history) behind.
+
+Named accounts also carry `profiles.avatar_url` and `profiles.pawn_photo_url`
+(both nullable, uploaded to the public `avatars` Storage bucket at
+`{user_id}/avatar.*` / `{user_id}/pawn.*`). `pawn_photo_url`, when set, is
+rendered as the player's board token instead of a flat colour disc.
 
 ### Session Expiry
 

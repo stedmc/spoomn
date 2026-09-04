@@ -88,7 +88,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Spoomn')),
+      appBar: AppBar(
+        title: const Text('Spoomn'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Profile',
+            onPressed: () => context.go('/profile'),
+          ),
+        ],
+      ),
       body: _loading ? const Center(child: CircularProgressIndicator()) : listView,
     );
   }

@@ -63,10 +63,12 @@ net_worth =
   + sum(purchase_price for each unmortgaged property owned)
   + sum(build_cost × houses for each property)
   + sum(build_cost × 5 for each hotel -- hotel = 5 houses equivalent in value)
+  + sum(total_remaining for each loan where player is lender)
+  - sum(total_remaining for each loan where player is borrower)
   - 0  (mortgaged properties excluded entirely -- no asset, no debt counted)
 ```
 
-Mortgaged properties are excluded from net worth entirely (not counted as asset, mortgage debt not subtracted) to avoid negative net worth calculations for players mid-liquidation.
+Mortgaged properties are excluded from net worth entirely (not counted as asset, mortgage debt not subtracted) to avoid negative net worth calculations for players mid-liquidation. Loan receivables and obligations are included at their current outstanding balance.
 
 ---
 
@@ -210,19 +212,3 @@ All players ranked at game end, including eliminated players. Eliminated players
 Last to Nth: eliminated players by elimination turn (earliest eliminated = last)
 ```
 
----
-
-## Optional: Loans
-
-| Config key | Default | Notes |
-|------------|---------|-------|
-| `loans_enabled` | false | If true, players may borrow from the bank |
-| `loan_amount` | 200 | Fixed loan amount per request |
-| `loan_interest_rate` | 0.1 | Interest charged per full turn while loan outstanding |
-| `max_loans_per_player` | 3 | Maximum simultaneous outstanding loans per player |
-
-When enabled, a player who cannot afford a payment may request a loan from the bank instead of liquidating. Loans accrue interest each turn. Bankruptcy is assessed only after all loans are exhausted.
-
-Outstanding loan balance deducted from net worth in all net worth calculations.
-
-Loans cannot be traded. They are personal to the borrowing player and cleared on bankruptcy (outstanding balance forfeit to bank).

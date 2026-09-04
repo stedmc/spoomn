@@ -12,6 +12,7 @@ import '../middleware/auth_middleware.dart';
 import 'auction_handler.dart' as auction;
 import 'building_handler.dart' as building;
 import 'mortgage_handler.dart' as mortgage;
+import 'stats_handler.dart';
 import 'trade_handler.dart' as trade;
 
 Future<Response> handleAction(Request request, String playerId) async {
@@ -625,6 +626,8 @@ Future<void> _endGame(
 
   await _writeLog(roomId, null, state['turn_number'] as int, 'game_over',
       {'reason': reason},);
+
+  await recordGameStats(roomId);
 }
 
 Future<Response> _declareBankruptcy(
@@ -728,6 +731,7 @@ Future<Response> _declareBankruptcy(
     }).eq('id', roomId);
     await _writeLog(roomId, playerId, state['turn_number'] as int, 'game_over',
         {'reason': 'bankruptcy'},);
+    await recordGameStats(roomId);
     return okJson({'bankrupt': true, 'game_over': true});
   }
 

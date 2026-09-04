@@ -49,6 +49,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
   Map<String, dynamic>? _cardDrawEntry;
   String? _lastShownCardEntryId;
   String? _lastToastEntryId;
+  String? _lastRollEntryId;
   final List<_ToastEntry> _toasts = [];
   Timer? _cardDismissTimer;
   Timer? _sequenceTimer;
@@ -71,6 +72,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
       ref.invalidate(roomConfigProvider(widget.roomId));
       _connect();
       _applyCurrentPlayerColours();
+      _game.setBoardFontSize(ref.read(boardFontSizeProvider));
+      _game.setColorScheme(ref.read(boardColorSchemeProvider));
     });
   }
 
@@ -109,6 +112,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     _game.setPlayerNames({
       for (final p in players) p.playerId: p.displayName ?? 'Guest',
     });
+    final pawnPhotos = ref.read(pawnPhotoUrlsProvider(widget.roomId)).value;
+    if (pawnPhotos != null) _game.setPlayerPawnPhotos(pawnPhotos);
   }
 
   Future<void> _connect() async {
@@ -136,7 +141,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
 
         debugPrint('[GameLog] action=${top['action']} id=$id');
 
-        if (top['action'] == GameAction.rollDice && !_isAnimating) {
+        if (top['action'] == GameAction.rollDice && !_isAnimating && id != _lastRollEntryId) {
+          _lastRollEntryId = id;
           _beginRollSequence(top);
         } else if (top['action'] == GameAction.drawCard) {
           _handleCardDraw(top);
@@ -197,6 +203,9 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
         });
       });
     });
+    ref.listen(pawnPhotoUrlsProvider(widget.roomId), (_, next) {
+      next.whenData(_game.setPlayerPawnPhotos);
+    });
     ref.listen(pendingTradesProvider(widget.roomId), (_, next) {
       next.whenData((trades) {
         if (trades.isNotEmpty) {
@@ -213,6 +222,9 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     });
     ref.listen(boardFontSizeProvider, (_, size) {
       _game.setBoardFontSize(size);
+    });
+    ref.listen(boardColorSchemeProvider, (_, scheme) {
+      _game.setColorScheme(scheme);
     });
     ref.listen(roomConfigProvider(widget.roomId), (_, next) {
       next.whenData((config) {

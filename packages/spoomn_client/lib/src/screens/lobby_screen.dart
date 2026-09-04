@@ -233,7 +233,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
   static const _deepLinkBase = String.fromEnvironment(
     'DEEP_LINK_BASE_URL',
-    defaultValue: 'spoomn://join',
+    defaultValue: 'https://spoomn.app/join',
   );
 
   void _copyInviteLink(String code) {
@@ -255,6 +255,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         child: Text('No players yet', style: TextStyle(color: Colors.grey)),
       );
     }
+    final onlineIds = ref.watch(onlinePlayerIdsProvider(widget.roomId)).value;
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -262,18 +263,19 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
       itemBuilder: (context, i) {
         final p = players[i];
         final isMe = p.playerId == myId;
+        final isOnline = onlineIds?.contains(p.playerId) ?? p.isConnected;
         return ListTile(
           dense: true,
           leading: CircleAvatar(
             radius: 16,
             child: Icon(
-              p.isConnected ? Icons.person : Icons.person_outline,
+              isOnline ? Icons.person : Icons.person_outline,
               size: 18,
             ),
           ),
           title: Text(_localNameOverrides[p.playerId] ?? p.displayName ?? 'Guest', style: const TextStyle(fontSize: 13)),
           subtitle: Text(
-            p.isConnected ? 'Connected' : 'Disconnected',
+            isOnline ? 'Online' : 'Offline',
             style: const TextStyle(fontSize: 11),
           ),
           trailing: Row(
@@ -396,6 +398,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Lobby'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => context.go('/dashboard'),
+        ),
         actions: [
           if (room != null) ...[
             Padding(

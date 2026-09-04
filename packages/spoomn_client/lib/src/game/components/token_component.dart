@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flame/components.dart';
 import 'package:flame/effects.dart';
 import 'package:flutter/material.dart';
@@ -16,7 +18,31 @@ class TokenComponent extends CircleComponent {
   int _currentSlot = 0;
   VoidCallback? onMoveComplete;
 
+  /// Set once the player's `pawn_photo_url` has been fetched and decoded.
+  /// When present, it's drawn cropped to the token's circle instead of the
+  /// flat colour disc.
+  ui.Image? pawnImage;
+
   set colour(Color value) => paint.color = value;
+
+  void _renderBody(Canvas canvas) {
+    final image = pawnImage;
+    if (image == null) {
+      super.render(canvas);
+      return;
+    }
+    final r = radius;
+    final rect = Rect.fromCircle(center: Offset(r, r), radius: r);
+    canvas.save();
+    canvas.clipPath(Path()..addOval(rect));
+    final src = Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble());
+    canvas.drawImageRect(image, src, rect, Paint()..filterQuality = FilterQuality.medium);
+    canvas.restore();
+    canvas.drawCircle(Offset(r, r), r, Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = Colors.white);
+  }
 
   static const _slotOffsets = [
     Offset(-8, -6),
@@ -102,7 +128,7 @@ class TokenComponent extends CircleComponent {
 
   @override
   void render(Canvas canvas) {
-    super.render(canvas);
+    _renderBody(canvas);
     if (isHovered && playerName != null) {
       final tp = TextPainter(
         text: TextSpan(

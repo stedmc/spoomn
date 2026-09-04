@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -87,6 +89,55 @@ Stream<List<RoomPlayer>> roomPlayers(Ref ref, String roomId) {
       });
 }
 
+// ---------------------------------------------------------------------------
+// Presence (who's actually got the page open right now)
+// ---------------------------------------------------------------------------
+
+/// Tracks which players currently have this room open via a Supabase Realtime
+/// Presence channel. Unlike [RoomPlayer.isConnected] (a DB flag flipped by
+/// explicit connect/disconnect calls, which can go stale if the client never
+/// gets to call disconnect), presence is driven by the websocket itself: the
+/// server evicts a client's presence as soon as its socket drops, including
+/// on tab close/crash/network loss.
+@riverpod
+Stream<Set<String>> onlinePlayerIds(Ref ref, String roomId) {
+  final controller = StreamController<Set<String>>();
+  final channel = Supabase.instance.client.channel('presence:room:$roomId');
+
+  void emit() {
+    if (controller.isClosed) return;
+    final ids = <String>{
+      for (final state in channel.presenceState())
+        for (final presence in state.presences)
+          if (presence.payload['player_id'] is String)
+            presence.payload['player_id'] as String,
+    };
+    controller.add(ids);
+  }
+
+  channel
+      .onPresenceSync((_) => emit())
+      .onPresenceJoin((_) => emit())
+      .onPresenceLeave((_) => emit())
+      .subscribe((status, error) async {
+    if (status == RealtimeSubscribeStatus.subscribed) {
+      final myId = Supabase.instance.client.auth.currentUser?.id;
+      if (myId != null) {
+        await channel.track({'player_id': myId});
+      }
+      emit();
+    }
+  });
+
+  ref.onDispose(() {
+    unawaited(channel.untrack());
+    unawaited(Supabase.instance.client.removeChannel(channel));
+    controller.close();
+  });
+
+  return controller.stream;
+}
+
 @riverpod
 RoomPlayer? myPlayer(Ref ref, String roomId) {
   final players = ref.watch(roomPlayersProvider(roomId)).value ?? [];
@@ -170,6 +221,59 @@ final pendingTradesProvider = StreamProvider.family<List<Map<String, dynamic>>, 
 final isDebugModeProvider = Provider.family<bool, String>((ref, roomId) {
   final config = ref.watch(roomConfigProvider(roomId));
   return config.value?['debug_mode'] as bool? ?? false;
+});
+
+// ---------------------------------------------------------------------------
+// Pawn photos (non-annotated, mirrors roomConfigProvider, to avoid touching
+// the generated RoomPlayer model just for a board-rendering detail)
+// ---------------------------------------------------------------------------
+
+final pawnPhotoUrlsProvider = StreamProvider.family<Map<String, String?>, String>(
+  (ref, roomId) {
+    return Supabase.instance.client
+        .from('room_players')
+        .stream(primaryKey: ['id'])
+        .eq('room_id', roomId)
+        .asyncMap((rows) async {
+          final playerIds = rows
+              .where((r) => r['left_at'] == null)
+              .map((r) => r['player_id'] as String)
+              .toSet()
+              .toList();
+          if (playerIds.isEmpty) return <String, String?>{};
+          final profiles = await Supabase.instance.client
+              .from('profiles')
+              .select('id, pawn_photo_url')
+              .inFilter('id', playerIds);
+          return {
+            for (final p in profiles) p['id'] as String: p['pawn_photo_url'] as String?,
+          };
+        });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Profile (current user's own row, editable from the profile screen)
+// ---------------------------------------------------------------------------
+
+final myProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null) return Stream.value(null);
+  return Supabase.instance.client
+      .from('profiles')
+      .stream(primaryKey: ['id'])
+      .eq('id', userId)
+      .map((rows) => rows.firstOrNull);
+});
+
+final myStatsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  final userId = Supabase.instance.client.auth.currentUser?.id;
+  if (userId == null) return null;
+  return Supabase.instance.client
+      .from('player_stats')
+      .select()
+      .eq('profile_id', userId)
+      .maybeSingle();
 });
 
 // ---------------------------------------------------------------------------

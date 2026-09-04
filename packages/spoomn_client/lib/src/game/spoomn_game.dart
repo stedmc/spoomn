@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flame/events.dart';
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:spoomn_core/spoomn_core.dart';
 
+import '../providers/settings_provider.dart';
 import 'components/board_component.dart';
 import 'components/dice_component.dart';
 import 'components/police_pawn_component.dart';
@@ -54,10 +57,15 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   final ValueNotifier<Map<String, Color>> playerColoursNotifier = ValueNotifier({});
 
   double boardFontSize = 12.0;
+  BoardColorScheme colorScheme = BoardColorScheme.classic;
   bool freeParkingJackpotEnabled = false;
 
   void setBoardFontSize(double size) {
     boardFontSize = size;
+  }
+
+  void setColorScheme(BoardColorScheme scheme) {
+    colorScheme = scheme;
   }
 
   void setFreeParkingJackpot(bool enabled) {
@@ -209,6 +217,46 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
     }
   }
 
+  final Map<String, String?> _pawnPhotoUrls = {};
+  final Map<String, ui.Image> _pawnImageCache = {};
+
+  void setPlayerPawnPhotos(Map<String, String?> urls) {
+    _pawnPhotoUrls
+      ..clear()
+      ..addAll(urls);
+    for (final entry in urls.entries) {
+      _applyPawnPhoto(entry.key, entry.value);
+    }
+  }
+
+  Future<void> _applyPawnPhoto(String playerId, String? url) async {
+    final token = _tokens[playerId];
+    if (url == null) {
+      token?.pawnImage = null;
+      return;
+    }
+    final cached = _pawnImageCache[url];
+    if (cached != null) {
+      token?.pawnImage = cached;
+      return;
+    }
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode != 200) return;
+      final codec = await ui.instantiateImageCodec(response.bodyBytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      _pawnImageCache[url] = image;
+      // Player may have swapped rooms/left by the time this resolves, or the
+      // token may not exist yet if this fired before the token was created.
+      if (_pawnPhotoUrls[playerId] == url) {
+        _tokens[playerId]?.pawnImage = image;
+      }
+    } catch (_) {
+      // Bad/unreachable URL: fall back to the colour disc, no error surfaced.
+    }
+  }
+
   void setHoveredPlayer(String? playerId) {
     if (_highlightLocked) return;
     if (playerId == _hoveredPlayerId) return;
@@ -305,6 +353,15 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
         );
         token.playerName = _playerNames[playerId];
         token.onMoveComplete = _onAnyTokenMoveComplete;
+        final pawnUrl = _pawnPhotoUrls[playerId];
+        if (pawnUrl != null) {
+          final cached = _pawnImageCache[pawnUrl];
+          if (cached != null) {
+            token.pawnImage = cached;
+          } else {
+            _applyPawnPhoto(playerId, pawnUrl);
+          }
+        }
         _tokens[playerId] = token;
         add(token);
       }

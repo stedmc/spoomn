@@ -4,6 +4,7 @@ import 'screens/dashboard_screen.dart';
 import 'screens/game_screen.dart';
 import 'screens/lobby_screen.dart';
 import 'screens/game_over_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/splash_screen.dart';
 
 final router = GoRouter(
@@ -16,6 +17,10 @@ final router = GoRouter(
     GoRoute(
       path: '/dashboard',
       builder: (context, state) => const DashboardScreen(),
+    ),
+    GoRoute(
+      path: '/profile',
+      builder: (context, state) => const ProfileScreen(),
     ),
     GoRoute(
       path: '/lobby/:roomId',

@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../../providers/providers.dart';
+import '../../providers/settings_provider.dart';
 import 'game_constants.dart';
-import 'group_colour.dart';
 
 class GameBuildSheet extends ConsumerWidget {
   const GameBuildSheet({
@@ -21,6 +21,7 @@ class GameBuildSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(gameStateProvider(roomId)).value;
     if (state == null) return const SizedBox.shrink();
+    final scheme = ref.watch(boardColorSchemeProvider);
 
     final config = ref.watch(roomConfigProvider(roomId)).value;
     final houseLimit = (config?['house_limit'] as int?) ?? 32;
@@ -80,7 +81,7 @@ class GameBuildSheet extends ConsumerWidget {
           final sq = Board.squares[idx];
           final houses = state.houses['$idx'] ?? 0;
           final hasHotel = state.hotels['$idx'] == true;
-          final colour = groupColour(sq.colourGroup);
+          final colour = scheme.groupColour(sq.colourGroup);
 
           final groupIndices = sq.colourGroup != null
               ? (Board.colourGroups[sq.colourGroup] ?? <int>[])
