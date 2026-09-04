@@ -20,6 +20,7 @@ Future<void> main() async {
   final prefs = await SharedPreferences.getInstance();
 
   _listenDeepLinks();
+  _listenPasswordRecovery();
 
   runApp(
     ProviderScope(
@@ -40,6 +41,14 @@ void _listenDeepLinks() {
       path = uri.path;
     }
     if (path.isNotEmpty) router.go(path);
+  });
+}
+
+void _listenPasswordRecovery() {
+  Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+    if (data.event == AuthChangeEvent.passwordRecovery) {
+      router.go('/profile?recovery=true');
+    }
   });
 }
 

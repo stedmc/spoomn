@@ -12,9 +12,17 @@ part 'providers.g.dart';
 // Auth
 // ---------------------------------------------------------------------------
 
+/// Fires on sign-in, sign-out, and user updates so dependent providers rebuild
+/// instead of freezing on whatever user was signed in when they first ran.
+final authStateChangesProvider = StreamProvider<AuthState>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange;
+});
+
 @riverpod
-String? currentUserId(Ref ref) =>
-    Supabase.instance.client.auth.currentUser?.id;
+String? currentUserId(Ref ref) {
+  ref.watch(authStateChangesProvider);
+  return Supabase.instance.client.auth.currentUser?.id;
+}
 
 // ---------------------------------------------------------------------------
 // Game room
@@ -257,6 +265,7 @@ final pawnPhotoUrlsProvider = StreamProvider.family<Map<String, String?>, String
 // ---------------------------------------------------------------------------
 
 final myProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
+  ref.watch(authStateChangesProvider);
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) return Stream.value(null);
   return Supabase.instance.client
@@ -267,6 +276,7 @@ final myProfileProvider = StreamProvider<Map<String, dynamic>?>((ref) {
 });
 
 final myStatsProvider = FutureProvider<Map<String, dynamic>?>((ref) async {
+  ref.watch(authStateChangesProvider);
   final userId = Supabase.instance.client.auth.currentUser?.id;
   if (userId == null) return null;
   return Supabase.instance.client

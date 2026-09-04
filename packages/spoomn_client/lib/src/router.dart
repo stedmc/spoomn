@@ -20,7 +20,9 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/profile',
-      builder: (context, state) => const ProfileScreen(),
+      builder: (context, state) => ProfileScreen(
+        isPasswordRecovery: state.uri.queryParameters['recovery'] == 'true',
+      ),
     ),
     GoRoute(
       path: '/lobby/:roomId',

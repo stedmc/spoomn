@@ -150,6 +150,7 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
       list.sort();
     }
     for (final entry in _tokens.entries) {
+      if (entry.value.isAnimating) continue; // don't cancel mid-animation on resize
       final sq = entry.value.currentSquare;
       final slot = squarePlayers[sq]!.indexOf(entry.key);
       entry.value.moveTo(sq, board: board, teleport: true, slot: slot);

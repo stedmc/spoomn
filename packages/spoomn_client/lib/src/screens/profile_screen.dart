@@ -11,7 +11,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/providers.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({super.key, this.isPasswordRecovery = false});
+
+  final bool isPasswordRecovery;
 
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
@@ -23,14 +25,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _uploadingAvatar = false;
   bool _uploadingPawn = false;
   bool _showSignIn = false;
+  bool _showNewPasswordCard = false;
 
   String? _favouriteProperty;
   String? _favouritePartner;
   bool _loadedFavourites = false;
 
+  bool _recoveringFromMissingProfile = false;
+  bool _missingProfileRecoveryFailed = false;
+
   @override
   void initState() {
     super.initState();
+    _showNewPasswordCard = widget.isPasswordRecovery;
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId != null) unawaited(_loadFavourites(userId));
   }
@@ -80,6 +87,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           : null;
       _favouritePartner = partnerName;
     });
+  }
+
+  /// Auth session survived but the profile row is gone (e.g. deleted server-side).
+  /// Sign out of the orphaned session and start a fresh anonymous one so the
+  /// screen falls back to the normal logged-out (create account / sign in) flow.
+  Future<void> _recoverFromMissingProfile() async {
+    if (_recoveringFromMissingProfile) return;
+    _recoveringFromMissingProfile = true;
+    try {
+      final client = Supabase.instance.client;
+      await client.auth.signOut();
+      await client.auth.signInAnonymously();
+      _loadedFavourites = false;
+      _nameController.clear();
+      if (!mounted) return;
+      ref.invalidate(myProfileProvider);
+      ref.invalidate(myStatsProvider);
+    } catch (_) {
+      if (mounted) setState(() => _missingProfileRecoveryFailed = true);
+    } finally {
+      _recoveringFromMissingProfile = false;
+    }
   }
 
   Future<void> _saveName(String userId) async {
@@ -146,6 +175,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Future<void> _sendPasswordReset(String email) async {
+    await Supabase.instance.client.auth.resetPasswordForEmail(email);
+  }
+
+  Future<void> _setNewPassword(String password) async {
+    await Supabase.instance.client.auth
+        .updateUser(UserAttributes(password: password));
+  }
+
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(myProfileProvider);
@@ -170,7 +208,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (profile) {
           if (profile == null) {
-            return const Center(child: Text('Profile not found'));
+            if (_missingProfileRecoveryFailed) {
+              return const Center(child: Text('Profile not found'));
+            }
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _recoverFromMissingProfile());
+            return const Center(child: CircularProgressIndicator());
           }
           if (_nameController.text.isEmpty) {
             _nameController.text = profile['display_name'] as String? ?? '';
@@ -182,6 +225,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
+              if (_showNewPasswordCard)
+                _SetNewPasswordCard(
+                  onSetPassword: _setNewPassword,
+                  onDismiss: () => setState(() => _showNewPasswordCard = false),
+                ),
+              if (_showNewPasswordCard) const SizedBox(height: 24),
               Center(
                 child: Column(
                   children: [
@@ -263,6 +312,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   onToggleSignIn: () => setState(() => _showSignIn = !_showSignIn),
                   onCreateAccount: (email, pass) => _createAccount(userId, email, pass),
                   onSignIn: _signInExisting,
+                  onForgotPassword: _sendPasswordReset,
                 )
               else
                 Card(
@@ -355,12 +405,14 @@ class _AccountUpgradeCard extends StatefulWidget {
     required this.onToggleSignIn,
     required this.onCreateAccount,
     required this.onSignIn,
+    required this.onForgotPassword,
   });
 
   final bool showSignIn;
   final VoidCallback onToggleSignIn;
   final Future<void> Function(String email, String password) onCreateAccount;
   final Future<void> Function(String email, String password) onSignIn;
+  final Future<void> Function(String email) onForgotPassword;
 
   @override
   State<_AccountUpgradeCard> createState() => _AccountUpgradeCardState();
@@ -370,6 +422,8 @@ class _AccountUpgradeCardState extends State<_AccountUpgradeCard> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _submitting = false;
+  bool _sendingReset = false;
+  bool _resetSent = false;
   String? _error;
 
   @override
@@ -395,6 +449,23 @@ class _AccountUpgradeCardState extends State<_AccountUpgradeCard> {
       setState(() => _error = e.toString());
     } finally {
       if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _email.text.trim();
+    if (email.isEmpty || _sendingReset) return;
+    setState(() {
+      _sendingReset = true;
+      _error = null;
+    });
+    try {
+      await widget.onForgotPassword(email);
+      if (mounted) setState(() => _resetSent = true);
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _sendingReset = false);
     }
   }
 
@@ -429,6 +500,20 @@ class _AccountUpgradeCardState extends State<_AccountUpgradeCard> {
               obscureText: true,
               decoration: const InputDecoration(labelText: 'Password'),
             ),
+            if (widget.showSignIn)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _sendingReset ? null : _forgotPassword,
+                  child: _sendingReset
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(_resetSent ? 'Reset email sent' : 'Forgotten password?'),
+                ),
+              ),
             if (_error != null) ...[
               const SizedBox(height: 8),
               Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
@@ -446,6 +531,97 @@ class _AccountUpgradeCardState extends State<_AccountUpgradeCard> {
               child: Text(widget.showSignIn
                   ? 'Create a new account instead'
                   : 'Already have an account? Sign in'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SetNewPasswordCard extends StatefulWidget {
+  const _SetNewPasswordCard({
+    required this.onSetPassword,
+    required this.onDismiss,
+  });
+
+  final Future<void> Function(String password) onSetPassword;
+  final VoidCallback onDismiss;
+
+  @override
+  State<_SetNewPasswordCard> createState() => _SetNewPasswordCardState();
+}
+
+class _SetNewPasswordCardState extends State<_SetNewPasswordCard> {
+  final _password = TextEditingController();
+  final _confirm = TextEditingController();
+  bool _submitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _password.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    if (_password.text != _confirm.text) {
+      setState(() => _error = 'Passwords do not match');
+      return;
+    }
+    if (_password.text.length < 6) {
+      setState(() => _error = 'Password must be at least 6 characters');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.onSetPassword(_password.text);
+      if (mounted) widget.onDismiss();
+    } catch (e) {
+      if (mounted) setState(() => _error = e.toString());
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Set a new password', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _password,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'New password'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _confirm,
+              obscureText: true,
+              decoration: const InputDecoration(labelText: 'Confirm password'),
+              onSubmitted: (_) => _submit(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(
+                      width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Save password'),
             ),
           ],
         ),

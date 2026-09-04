@@ -19,6 +19,8 @@ class TokenComponent extends CircleComponent {
   int _currentSlot = 0;
   VoidCallback? onMoveComplete;
 
+  bool get isAnimating => children.whereType<TimerComponent>().isNotEmpty;
+
   /// Set once the player's `pawn_photo_url` has been fetched and decoded.
   /// When present, it's drawn cropped to the token's circle instead of the
   /// flat colour disc.
