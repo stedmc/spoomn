@@ -46,6 +46,8 @@ create table public.player_stats (
   monopolies_completed  int not null default 0,
   jail_visits           int not null default 0,
   tax_paid_total        int not null default 0,
+  total_squares_moved          int not null default 0,
+  total_squares_moved_backward int not null default 0,
   fastest_win_turns     int,
   updated_at            timestamptz not null default now()
 );
@@ -67,7 +69,7 @@ create table public.trade_stats (
 );
 ```
 
-`peak_net_worth` and `property_stats.times_owned` are computed from the game's *final* state, not tracked incrementally through the game -- cheap, and close enough for a stat rather than a ledger. `avg_placement` is a running average updated in place (`new = old + (placement - old) / games_played`), never recomputed from history.
+`peak_net_worth` and `property_stats.times_owned` are computed from the game's *final* state, not tracked incrementally through the game -- cheap, and close enough for a stat rather than a ledger. `avg_placement` is a running average updated in place (`new = old + (placement - old) / games_played`), never recomputed from history. `total_squares_moved` / `total_squares_moved_backward` are reconstructed from that game's `game_log` rows -- forward squares from every `roll_dice` entry that actually moved the player, backward squares from `move_relative` card effects with a negative offset (the only way to move backward is currently the "Go back three spaces" chance card).
 
 ---
 
@@ -310,6 +312,27 @@ create policy "player can read own game state"
 ```
 
 Named account users skip step 2-4 -- query uses `auth.uid()` directly.
+
+---
+
+## Data Retention
+
+A `pg_cron` job (`public.cleanup_stale_data`, migration `015_cleanup_stale_data.sql`) runs
+daily against Postgres directly -- independent of the Fly.io app, which auto-stops when idle
+and can't be relied on to run its own timers. It deletes, in order:
+
+1. Games made up entirely of guest profiles with no activity in 14+ days (any status,
+   including lobbies nobody started).
+2. Any game that never reached `'finished'` with no activity in 30+ days (abandoned
+   lobby/active/paused games).
+3. Guest profiles older than a day no longer referenced by any game.
+
+Deleting a `game_rooms` row cascades to `room_players`, `room_configs`, `game_state`,
+`active_traps`, `pending_trades` and `game_log` via FK, so no per-table cleanup is needed
+there. `player_stats` / `property_stats` / `trade_stats` are never touched by cleanup --
+they're permanent and already fully rolled up the moment a game finishes (`recordGameStats`
+runs synchronously right after `game_rooms.status` becomes `'finished'`), so nothing is lost
+by the time an old finished game is swept up.
 
 ---
 

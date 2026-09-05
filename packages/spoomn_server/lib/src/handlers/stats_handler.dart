@@ -77,6 +77,39 @@ Future<void> recordGameStats(String roomId) async {
       .where((r) => r['player_id'] == playerId && r['action'] == 'tax_payment')
       .fold(0, (sum, r) => sum + ((r['payload'] as Map)['amount'] as int? ?? 0));
 
+  // Forward movement comes from every dice roll that actually moved the
+  // player (jail-escape and forced-fine rolls included; rolls that only
+  // change jail state carry no 'new_position' and are excluded). Backward
+  // movement only happens via a 'move_relative' card effect with a negative
+  // offset (e.g. "Go back three spaces") -- 'move_to'/'move_to_nearest' cards
+  // only ever advance, so they're not walked here.
+  int squaresMovedForward(String playerId) {
+    var total = 0;
+    for (final row in logRows) {
+      if (row['player_id'] != playerId) continue;
+      final payload = row['payload'] as Map<String, dynamic>;
+      if (row['action'] == 'roll_dice' && payload.containsKey('new_position')) {
+        total += (payload['roll'] as List).cast<int>().fold(0, (a, b) => a + b);
+      } else if (row['action'] == 'draw_card') {
+        final effect = (payload['effect'] as Map?)?.cast<String, dynamic>();
+        final squares = effect?['type'] == 'move_relative' ? effect!['squares'] as int : 0;
+        if (squares > 0) total += squares;
+      }
+    }
+    return total;
+  }
+
+  int squaresMovedBackward(String playerId) {
+    var total = 0;
+    for (final row in logRows) {
+      if (row['player_id'] != playerId || row['action'] != 'draw_card') continue;
+      final effect = ((row['payload'] as Map)['effect'] as Map?)?.cast<String, dynamic>();
+      final squares = effect?['type'] == 'move_relative' ? effect!['squares'] as int : 0;
+      if (squares < 0) total += -squares;
+    }
+    return total;
+  }
+
   final monopolyOwner = <String, String>{}; // colourGroup -> owner, if complete
   for (final entry in Board.colourGroups.entries) {
     final owners = entry.value.map((sq) => ownership['$sq']).toSet();
@@ -95,6 +128,8 @@ Future<void> recordGameStats(String roomId) async {
     final isWinner = playerId == winnerId;
     final netWorth = netWorthOf(playerId);
     final monopolies = monopolyOwner.values.where((o) => o == playerId).length;
+    final forwardSquares = squaresMovedForward(playerId);
+    final backwardSquares = squaresMovedBackward(playerId);
 
     statsUpserts.add({
       'profile_id': playerId,
@@ -116,6 +151,11 @@ Future<void> recordGameStats(String roomId) async {
       'jail_visits':
           (existing?['jail_visits'] as int? ?? 0) + countAction(playerId, 'go_to_jail'),
       'tax_paid_total': (existing?['tax_paid_total'] as int? ?? 0) + sumTax(playerId),
+      'total_squares_moved': (existing?['total_squares_moved'] as int? ?? 0) +
+          forwardSquares +
+          backwardSquares,
+      'total_squares_moved_backward':
+          (existing?['total_squares_moved_backward'] as int? ?? 0) + backwardSquares,
       'fastest_win_turns': isWinner
           ? [existing?['fastest_win_turns'] as int?, turnNumber]
               .whereType<int>()

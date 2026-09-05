@@ -374,6 +374,8 @@ class _StatsGrid extends StatelessWidget {
       ('Monopolies completed', '${stats!['monopolies_completed'] ?? 0}'),
       ('Jail visits', '${stats!['jail_visits'] ?? 0}'),
       ('Tax paid', '£${stats!['tax_paid_total'] ?? 0}'),
+      ('Squares moved', '${stats!['total_squares_moved'] ?? 0}'),
+      ('Squares moved backward', '${stats!['total_squares_moved_backward'] ?? 0}'),
       (
         'Fastest win',
         stats!['fastest_win_turns'] != null ? '${stats!['fastest_win_turns']} turns' : '—'

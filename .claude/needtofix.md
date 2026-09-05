@@ -1,12 +1,12 @@
-- need a service to clean old database entries: 
-    - old guest profiles that aren't in any games in over 1 day
-    - old games with only guest profiles that haven't had any activity in over 14 days
-    - game rooms should be completed after game complete
-    - old incomplete games if no activity for 1 month
-    - etc.
-    - all tables need to be cleaned up
-    - we need to ensure statistics are stored and updated as figures before things are deleted
-- more stats to track (if not already):
-    - total squares moved
-    - total squares moved backwards
-    - number of games
+All items below implemented:
+
+- cleanup service: `supabase/migrations/015_cleanup_stale_data.sql` (`public.cleanup_stale_data`,
+  scheduled daily via pg_cron). Deletes guest-only games idle 14+ days, any incomplete game idle
+  30+ days, and orphaned guest profiles older than 1 day. Game deletion cascades to all child
+  tables via FK. Stats are unaffected -- already permanently rolled up at game-finish time in
+  `stats_handler.dart`, before any cleanup runs. See "Data Retention" in
+  `docs/architecture/03-data-model.md`.
+- game rooms already transition to `status: 'finished'` on completion (`action_handler.dart`) --
+  no fix needed there, just confirmed as a precondition for the cleanup rules above.
+- new stats: `total_squares_moved`, `total_squares_moved_backward` added to `player_stats`
+  (`014_movement_stats.sql`), computed in `stats_handler.dart`. `games_played` already existed.
