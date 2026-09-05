@@ -320,7 +320,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
           // Toast notifications — centred over board area
           if (_toasts.isNotEmpty)
             Positioned(
-              top: 72,
+              top: 120,
               left: 0,
               right: isMobile ? 0 : sidePanelWidth,
               child: Center(
