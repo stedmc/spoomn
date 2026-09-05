@@ -28,12 +28,16 @@ const List<String> _groupOrder = [
   'brown', 'lightBlue', 'pink', 'orange', 'red', 'yellow', 'green', 'darkBlue',
 ];
 
+/// Default repayment length (borrower turns) pre-filled into the loan card.
+/// The lender can change it per trade.
+const int _kDefaultLoanTurns = 10;
+
 // ─── Drag data ────────────────────────────────────────────────────────────────
 
 class _TradeDragData {
   const _TradeDragData({required this.ownerId, required this.propIndex});
   final String ownerId;
-  final int propIndex; // board index ≥ 0 | -1 = cash | -2 = rent immunity
+  final int propIndex; // board index ≥ 0 | -1 = cash | -2 = rent immunity | -3 = loan
 }
 
 // ─── Arrow painter ────────────────────────────────────────────────────────────
@@ -43,9 +47,11 @@ class _ArrowPainter extends CustomPainter {
     required this.propAssignments,
     required this.moneyTargets,
     required this.rentTargets,
+    required this.loanTargets,
     required this.cardKeys,
     required this.cashKeys,
     required this.rentKeys,
+    required this.loanKeys,
     required this.pawnKeys,
     required this.stackKey,
     required this.playerColors,
@@ -54,9 +60,11 @@ class _ArrowPainter extends CustomPainter {
   final Map<String, String> propAssignments;
   final Map<String, String> moneyTargets;
   final Map<String, String> rentTargets;
+  final Map<String, String> loanTargets;
   final Map<String, GlobalKey> cardKeys;
   final Map<String, GlobalKey> cashKeys;
   final Map<String, GlobalKey> rentKeys;
+  final Map<String, GlobalKey> loanKeys;
   final Map<String, GlobalKey> pawnKeys;
   final GlobalKey stackKey;
   final Map<String, Color> playerColors;
@@ -77,6 +85,10 @@ class _ArrowPainter extends CustomPainter {
     for (final e in rentTargets.entries) {
       _arrow(canvas, stackBox, rentKeys[e.key], pawnKeys[e.value],
           Colors.deepPurple.shade400);
+    }
+    for (final e in loanTargets.entries) {
+      _arrow(canvas, stackBox, loanKeys[e.key], pawnKeys[e.value],
+          const Color(0xFFFF8F00));
     }
   }
 
@@ -443,6 +455,182 @@ class _RentImmunityCard extends StatelessWidget {
   }
 }
 
+// ─── Loan input card ──────────────────────────────────────────────────────────
+
+class _LoanInputCard extends StatefulWidget {
+  const _LoanInputCard({
+    required this.amountController,
+    required this.turnsController,
+    required this.interestController,
+    required this.maxAmount,
+    this.assignedToColor,
+    this.isBeingDragged = false,
+    this.enabled = true,
+  });
+
+  final TextEditingController amountController;
+  final TextEditingController turnsController;
+  final TextEditingController interestController;
+  final int maxAmount;
+  final Color? assignedToColor;
+  final bool isBeingDragged;
+  final bool enabled;
+
+  @override
+  State<_LoanInputCard> createState() => _LoanInputCardState();
+}
+
+class _LoanInputCardState extends State<_LoanInputCard> {
+  @override
+  void initState() {
+    super.initState();
+    widget.amountController.addListener(_onChanged);
+    widget.turnsController.addListener(_onChanged);
+    widget.interestController.addListener(_onChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.amountController.removeListener(_onChanged);
+    widget.turnsController.removeListener(_onChanged);
+    widget.interestController.removeListener(_onChanged);
+    super.dispose();
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final amount   = int.tryParse(widget.amountController.text) ?? 0;
+    final turns    = int.tryParse(widget.turnsController.text) ?? 0;
+    final interest = (double.tryParse(widget.interestController.text) ?? 0) / 100.0;
+    final terms    = LoanTerms(amount: amount, turns: turns, interestRate: interest);
+    final total    = terms.isValid ? terms.totalRepayable : 0;
+    final perTurn  = terms.isValid ? terms.instalment : 0;
+
+    Widget field(TextEditingController c, String hint, {int max = 999999, String? suffix}) => Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4)),
+          child: TextField(
+            controller: c,
+            enabled: widget.enabled,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.black),
+            decoration: InputDecoration(
+              isDense: true,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              hintText: hint,
+              hintStyle: const TextStyle(fontSize: 9, color: Colors.grey),
+              suffixText: suffix,
+              suffixStyle: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            onChanged: (v) {
+              final parsed = int.tryParse(v) ?? 0;
+              if (parsed > max) {
+                c.text = max.toString();
+                c.selection = TextSelection.collapsed(offset: max.toString().length);
+              }
+            },
+          ),
+        );
+
+    // Persistent caption above each field in the turns/interest row so it is
+    // always clear which value is which, even once both are filled in.
+    Widget captioned(String label, Widget f) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: const TextStyle(
+                    fontSize: 7, fontWeight: FontWeight.bold, color: Colors.white)),
+            const SizedBox(height: 1),
+            f,
+          ],
+        );
+
+    final card = Container(
+      width: 104,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFEF6C00), Color(0xFFFFB300)],
+        ),
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 3, offset: const Offset(0, 1)),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.account_balance, size: 14, color: Colors.white),
+                SizedBox(width: 3),
+                Text('LOAN',
+                    style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(children: [
+              const Text('£', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(width: 2),
+              Expanded(child: field(widget.amountController, 'value', max: widget.maxAmount)),
+            ]),
+            const SizedBox(height: 3),
+            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Expanded(
+                  child: captioned('TURNS',
+                      field(widget.turnsController, '0', max: 99, suffix: 't'))),
+              const SizedBox(width: 3),
+              Expanded(
+                  child: captioned('INTEREST',
+                      field(widget.interestController, '0', max: 100, suffix: '%'))),
+            ]),
+            const SizedBox(height: 3),
+            Text(
+              perTurn > 0 ? '£$perTurn/turn · £$total total' : 'Bal: £${widget.maxAmount}',
+              style: const TextStyle(fontSize: 7, color: Colors.white),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return Opacity(
+      opacity: widget.isBeingDragged ? 0.35 : 1.0,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          card,
+          if (widget.assignedToColor != null)
+            Positioned(
+              top: -4, right: -4,
+              child: Container(
+                width: 10, height: 10,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle, color: widget.assignedToColor,
+                  border: Border.all(color: Colors.white, width: 1),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Public widget ────────────────────────────────────────────────────────────
 
 class TradeOverlay extends ConsumerStatefulWidget {
@@ -473,10 +661,15 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
   final Map<String, String> _propAssignments  = {}; // 'ownerId:propIdx' -> targetPid
   final Map<String, String> _moneyTargets     = {}; // ownerId -> targetPid
   final Map<String, String> _rentTargets      = {}; // ownerId -> targetPid
+  final Map<String, String> _loanTargets      = {}; // lenderId -> borrowerId
+  final Set<String> _loanSeeded               = {}; // pids seeded with default terms
 
   // ── Controllers ───────────────────────────────────────────────────────────
   final Map<String, TextEditingController> _moneyControllers = {};
   final Map<String, TextEditingController> _rentControllers  = {};
+  final Map<String, TextEditingController> _loanAmountControllers   = {};
+  final Map<String, TextEditingController> _loanTurnsControllers    = {};
+  final Map<String, TextEditingController> _loanInterestControllers = {};
 
   // ── Sub-phase (initiation only) ───────────────────────────────────────────
   bool _inSelectionPhase = true; // true = select players, false = assign assets
@@ -493,6 +686,7 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
   final Map<String, GlobalKey> _cardKeys  = {};
   final Map<String, GlobalKey> _cashKeys  = {};
   final Map<String, GlobalKey> _rentKeys  = {};
+  final Map<String, GlobalKey> _loanKeys  = {};
 
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -520,6 +714,9 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
   void dispose() {
     for (final c in _moneyControllers.values) { c.dispose(); }
     for (final c in _rentControllers.values)  { c.dispose(); }
+    for (final c in _loanAmountControllers.values)   { c.dispose(); }
+    for (final c in _loanTurnsControllers.values)    { c.dispose(); }
+    for (final c in _loanInterestControllers.values) { c.dispose(); }
     super.dispose();
   }
 
@@ -531,15 +728,24 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
   TextEditingController _rentCtrl(String pid) =>
       _rentControllers.putIfAbsent(pid, () => TextEditingController(text: ''));
 
+  TextEditingController _loanAmountCtrl(String pid) =>
+      _loanAmountControllers.putIfAbsent(pid, () => TextEditingController(text: ''));
+  TextEditingController _loanTurnsCtrl(String pid) =>
+      _loanTurnsControllers.putIfAbsent(pid, () => TextEditingController(text: ''));
+  TextEditingController _loanInterestCtrl(String pid) =>
+      _loanInterestControllers.putIfAbsent(pid, () => TextEditingController(text: ''));
+
   GlobalKey _pawnKey(String pid) => _pawnKeys.putIfAbsent(pid, GlobalKey.new);
   GlobalKey _cardKey(String key) => _cardKeys.putIfAbsent(key, GlobalKey.new);
   GlobalKey _cashKey(String pid) => _cashKeys.putIfAbsent(pid, GlobalKey.new);
   GlobalKey _rentKey(String pid) => _rentKeys.putIfAbsent(pid, GlobalKey.new);
+  GlobalKey _loanKey(String pid) => _loanKeys.putIfAbsent(pid, GlobalKey.new);
 
   void _populateFromTrade(Map<String, dynamic> trade) {
     _propAssignments.clear();
     _moneyTargets.clear();
     _rentTargets.clear();
+    _loanTargets.clear();
     final legs = (trade['legs'] as List?)?.cast<Map<String, dynamic>>() ?? [];
     for (final leg in legs) {
       final from = leg['from'] as String? ?? '';
@@ -556,6 +762,18 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
       if (rentTurns > 0) {
         _rentTargets[from] = to;
         _rentCtrl(from).text = rentTurns.toString();
+      }
+      final loan = leg['loan'];
+      if (loan is Map) {
+        final amount = (loan['amount'] as num?)?.toInt() ?? 0;
+        if (amount > 0) {
+          _loanTargets[from] = to;
+          _loanAmountCtrl(from).text = amount.toString();
+          _loanTurnsCtrl(from).text =
+              ((loan['turns'] as num?)?.toInt() ?? 0).toString();
+          final interest = (loan['interest_rate'] as num?)?.toDouble() ?? 0.0;
+          _loanInterestCtrl(from).text = (interest * 100).round().toString();
+        }
       }
     }
   }
@@ -585,6 +803,23 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
           participants.firstWhere((p) => p != pid, orElse: () => '');
       if (toId.isEmpty) continue;
       ensure(pid, toId)['rent_immunity_turns'] = turns;
+    }
+    for (final pid in participants) {
+      // A loan is only part of the trade when the lender has explicitly
+      // assigned it to a borrower (dragged the loan card onto a player).
+      // Never fall back to a default target — an untargeted loan card is
+      // just a scratchpad and must not be sent.
+      final toId = _loanTargets[pid];
+      if (toId == null || toId.isEmpty) continue;
+      final amount = int.tryParse(_loanAmountCtrl(pid).text) ?? 0;
+      final turns  = int.tryParse(_loanTurnsCtrl(pid).text) ?? 0;
+      if (amount <= 0 || turns <= 0) continue;
+      final pct = double.tryParse(_loanInterestCtrl(pid).text) ?? 0;
+      ensure(pid, toId)['loan'] = LoanTerms(
+        amount: amount,
+        turns: turns,
+        interestRate: pct / 100.0,
+      ).toLeg();
     }
 
     return legMap.values.toList();
@@ -756,9 +991,11 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
               propAssignments: _propAssignments,
               moneyTargets: _moneyTargets,
               rentTargets: _rentTargets,
+              loanTargets: _loanTargets,
               cardKeys: _cardKeys,
               cashKeys: _cashKeys,
               rentKeys: _rentKeys,
+              loanKeys: _loanKeys,
               pawnKeys: _pawnKeys,
               stackKey: _stackKey,
               playerColors: playerColors,
@@ -842,6 +1079,7 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
                   _propAssignments.clear();
                   _moneyTargets.clear();
                   _rentTargets.clear();
+                  _loanTargets.clear();
                   if (widget.trade != null) _populateFromTrade(widget.trade!);
                 });
               } else {
@@ -850,6 +1088,7 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
                   _propAssignments.clear();
                   _moneyTargets.clear();
                   _rentTargets.clear();
+                  _loanTargets.clear();
                 });
               }
             },
@@ -971,6 +1210,10 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
           } else if (d.data.propIndex == -2) {
             final turns = int.tryParse(_rentCtrl(d.data.ownerId).text) ?? 0;
             if (turns > 0) _rentTargets[d.data.ownerId] = pid;
+          } else if (d.data.propIndex == -3) {
+            final amount = int.tryParse(_loanAmountCtrl(d.data.ownerId).text) ?? 0;
+            final turns  = int.tryParse(_loanTurnsCtrl(d.data.ownerId).text) ?? 0;
+            if (amount > 0 && turns > 0) _loanTargets[d.data.ownerId] = pid;
           }
         });
       },
@@ -1111,10 +1354,18 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
       _propAssignments.clear();
       _moneyTargets.clear();
       _rentTargets.clear();
+      _loanTargets.clear();
       for (final c in _moneyControllers.values) { c.dispose(); }
       for (final c in _rentControllers.values)  { c.dispose(); }
+      for (final c in _loanAmountControllers.values)   { c.dispose(); }
+      for (final c in _loanTurnsControllers.values)    { c.dispose(); }
+      for (final c in _loanInterestControllers.values) { c.dispose(); }
       _moneyControllers.clear();
       _rentControllers.clear();
+      _loanAmountControllers.clear();
+      _loanTurnsControllers.clear();
+      _loanInterestControllers.clear();
+      _loanSeeded.clear();
       if (activeTrade != null) _populateFromTrade(activeTrade);
       _selectedPlayers.clear();
       for (final p in participantIds) {
@@ -1349,6 +1600,62 @@ class _TradeOverlayState extends ConsumerState<TradeOverlay> {
             )
           : rentCard,
     );
+
+    // Loan card (only when loans are enabled for this room)
+    if (config?['loans_enabled'] as bool? ?? false) {
+      cols.add(const SizedBox(width: 8));
+      final loanAmountCtrl   = _loanAmountCtrl(pid);
+      final loanTurnsCtrl    = _loanTurnsCtrl(pid);
+      final loanInterestCtrl = _loanInterestCtrl(pid);
+      // Pre-fill the repayment length once so the borrower need not type it;
+      // amount and interest are left blank for the lender to set per trade.
+      if (!_isResponseMode && _loanSeeded.add(pid)) {
+        if (loanTurnsCtrl.text.isEmpty) {
+          loanTurnsCtrl.text = _kDefaultLoanTurns.toString();
+        }
+      }
+      final loanColor = _loanTargets[pid] != null
+          ? _tokenColor(allPlayers.where((p) => p.playerId == _loanTargets[pid]).firstOrNull?.tokenColour)
+          : null;
+      final loanCard = KeyedSubtree(
+        key: _loanKey(pid),
+        child: _LoanInputCard(
+          amountController: loanAmountCtrl,
+          turnsController: loanTurnsCtrl,
+          interestController: loanInterestCtrl,
+          maxAmount: balance,
+          assignedToColor: loanColor,
+          enabled: !_isResponseMode,
+        ),
+      );
+      // Loan: lend from this player to the drop target — values checked on drop/submit
+      cols.add(
+        canDrag
+            ? Draggable<_TradeDragData>(
+                data: _TradeDragData(ownerId: pid, propIndex: -3),
+                feedback: Material(
+                    color: Colors.transparent, elevation: 8,
+                    child: _LoanInputCard(
+                      amountController: loanAmountCtrl,
+                      turnsController: loanTurnsCtrl,
+                      interestController: loanInterestCtrl,
+                      maxAmount: balance,
+                    )),
+                childWhenDragging: _LoanInputCard(
+                  amountController: loanAmountCtrl,
+                  turnsController: loanTurnsCtrl,
+                  interestController: loanInterestCtrl,
+                  maxAmount: balance,
+                  isBeingDragged: true,
+                ),
+                child: GestureDetector(
+                  onTap: () => setState(() => _loanTargets.remove(pid)),
+                  child: loanCard,
+                ),
+              )
+            : loanCard,
+      );
+    }
 
     if (cols.isEmpty) {
       return Padding(

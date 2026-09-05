@@ -486,6 +486,24 @@ Future<Response> removePlayer(Request request, String playerId) async {
   return okJson({'removed': true, 'player_id': targetPlayerId});
 }
 
+Future<Response> deleteRoom(Request request, String playerId) async {
+  final roomId = request.params['roomId']!;
+
+  final room = await supabase
+      .from('game_rooms')
+      .select('host_id')
+      .eq('id', roomId)
+      .maybeSingle();
+
+  if (room == null) return errorJson(404, 'NOT_FOUND', 'Room not found');
+  if (room['host_id'] != playerId) {
+    return errorJson(403, 'NOT_HOST', 'Only the host can delete the game');
+  }
+
+  await supabase.from('game_rooms').delete().eq('id', roomId);
+  return okJson({'deleted': true});
+}
+
 Future<Response> updateRoomConfig(Request request, String playerId) async {
   final roomId = request.params['roomId']!;
   final body = jsonDecode(await request.readAsString()) as Map<String, dynamic>;
@@ -522,7 +540,7 @@ Future<Response> updateRoomConfig(Request request, String playerId) async {
     'trade_any_turn', 'multi_party_trades', 'trade_futures', 'trade_timeout_secs',
     'winning_condition', 'net_worth_target', 'net_worth_check', 'turn_limit', 'time_limit_mins',
     'bankruptcy_assets_to', 'allow_bankruptcy_negotiation', 'negotiation_timeout_secs', 'repayment_interest_rate',
-    'loans_enabled', 'loan_amount', 'loan_interest_rate', 'max_loans_per_player',
+    'loans_enabled',
     'async_turn_timeout_hours', 'async_turn_reminder_hours',
   };
   final updates = {

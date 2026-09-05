@@ -29,6 +29,8 @@ abstract final class GameAction {
   static const String rejectTrade  = 'reject_trade';
   static const String cancelTrade  = 'cancel_trade';
   static const String counterTrade = 'counter_trade';
+  static const String loanRepayment = 'loan_repayment';
+  static const String loanRepaid = 'loan_repaid';
 }
 
 abstract final class GamePhaseName {

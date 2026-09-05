@@ -524,6 +524,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
       GameAction.goToJail => '$name was sent to Jail',
       GameAction.jailbreak => '$name broke out of Jail',
       GameAction.useGoojfCard => '$name used their Get Out of Jail Free card',
+      GameAction.loanRepaid => '$name cleared a loan',
       _ => null,
     };
   }

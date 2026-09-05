@@ -33,7 +33,7 @@ Future<void> main() async {
 void _listenDeepLinks() {
   AppLinks().uriLinkStream.listen((uri) {
     // spoomn://join/CODE → host='join', path='/CODE' → router path '/join/CODE'
-    // https://spoomn.app/join/CODE → path='/join/CODE' → router path '/join/CODE'
+    // https://spoomn.online/join/CODE → path='/join/CODE' → router path '/join/CODE'
     String path;
     if (uri.scheme == 'spoomn' && uri.host == 'join') {
       path = '/join${uri.path}';

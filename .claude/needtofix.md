@@ -1,12 +1,11 @@
 All items below implemented:
 
-- cleanup service: `supabase/migrations/015_cleanup_stale_data.sql` (`public.cleanup_stale_data`,
-  scheduled daily via pg_cron). Deletes guest-only games idle 14+ days, any incomplete game idle
-  30+ days, and orphaned guest profiles older than 1 day. Game deletion cascades to all child
-  tables via FK. Stats are unaffected -- already permanently rolled up at game-finish time in
-  `stats_handler.dart`, before any cleanup runs. See "Data Retention" in
-  `docs/architecture/03-data-model.md`.
-- game rooms already transition to `status: 'finished'` on completion (`action_handler.dart`) --
-  no fix needed there, just confirmed as a precondition for the cleanup rules above.
-- new stats: `total_squares_moved`, `total_squares_moved_backward` added to `player_stats`
-  (`014_movement_stats.sql`), computed in `stats_handler.dart`. `games_played` already existed.
+- host can delete a game from the lobby (AppBar overflow menu) or the home game list
+  (per-card overflow menu). New `POST /api/rooms/<roomId>/delete` (`deleteRoom` in
+  `room_handler.dart`) is host-gated; the row delete cascades to all child tables via FK.
+  Confirmation dialog on both entry points.
+- loans moved from their own settings section into "Trading". Toggle subtext now reads
+  "Players can lend cash to each other as part of a trade". `max_loans_per_player` removed
+  entirely -- settings tile, `kRoomConfigDefaults`, custom-rule label, server allow-list,
+  `RoomConfig` model, and the per-borrower cap checks in `trade_handler.dart`. Column drop:
+  `supabase/migrations/016_drop_max_loans_per_player.sql`.

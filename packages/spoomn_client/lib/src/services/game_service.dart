@@ -83,6 +83,9 @@ class GameService {
   Future<void> removePlayer(String roomId, String targetPlayerId) =>
       _post('/api/rooms/$roomId/remove-player', {'player_id': targetPlayerId});
 
+  Future<void> deleteRoom(String roomId) =>
+      _post('/api/rooms/$roomId/delete', {});
+
   Future<void> updateConfig(String roomId, Map<String, dynamic> updates) async {
     final jwt = Supabase.instance.client.auth.currentSession?.accessToken;
     if (jwt == null) throw StateError('No active session');
@@ -91,12 +94,20 @@ class GameService {
       headers: {'Authorization': 'Bearer $jwt', 'Content-Type': 'application/json'},
       body: jsonEncode(updates),
     );
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+
+    Map<String, dynamic>? decoded;
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (_) {
+      decoded = null;
+    }
+
     if (response.statusCode != 200) {
-      final error = decoded['error'] as Map<String, dynamic>?;
+      final error = decoded?['error'] as Map<String, dynamic>?;
       throw GameServiceException(
         code: error?['code'] as String? ?? 'UNKNOWN',
-        message: error?['message'] as String? ?? 'Unknown error',
+        message: error?['message'] as String? ??
+            'Config update failed (${response.statusCode})',
         statusCode: response.statusCode,
       );
     }

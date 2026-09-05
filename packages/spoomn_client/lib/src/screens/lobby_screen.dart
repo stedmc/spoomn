@@ -95,7 +95,6 @@ String? _ruleLabel(String key, dynamic value) {
     'bankruptcy_assets_to': 'Bankruptcy assets to',
     'allow_bankruptcy_negotiation': 'Bankruptcy negotiation',
     'loans_enabled': 'Loans',
-    'max_loans_per_player': 'Max loans',
     'async_turn_timeout_hours': 'Async turn timeout',
   };
 
@@ -160,10 +159,11 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     setState(() => _pendingDebugMode = enabled);
     try {
       await ref.read(gameServiceProvider).setDebugMode(widget.roomId, enabled: enabled);
-    } on GameServiceException catch (e) {
-      setState(() => _pendingDebugMode = null);
+    } catch (e) {
+      if (mounted) setState(() => _pendingDebugMode = null);
+      final message = e is GameServiceException ? e.message : 'Could not update debug mode';
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -214,6 +214,38 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
     }
   }
 
+  Future<void> _confirmDeleteGame() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete game?'),
+        content: const Text('This permanently removes the game for all players.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(gameServiceProvider).deleteRoom(widget.roomId);
+      if (mounted) context.go('/dashboard');
+    } on GameServiceException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
   Future<void> _startGame() async {
     try {
       await ref.read(gameServiceProvider).startRoom(widget.roomId);
@@ -233,7 +265,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
 
   static const _deepLinkBase = String.fromEnvironment(
     'DEEP_LINK_BASE_URL',
-    defaultValue: 'https://spoomn.app/join',
+    defaultValue: 'https://spoomn.online/join',
   );
 
   void _copyInviteLink(String code) {
@@ -431,6 +463,16 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               ),
             ),
           ],
+          if (isHost)
+            PopupMenuButton<String>(
+              tooltip: 'Lobby options',
+              onSelected: (v) {
+                if (v == 'delete') _confirmDeleteGame();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'delete', child: Text('Delete game')),
+              ],
+            ),
         ],
       ),
       body: roomAsync.when(

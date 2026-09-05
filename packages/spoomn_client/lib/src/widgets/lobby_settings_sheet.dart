@@ -75,7 +75,6 @@ const Map<String, dynamic> kRoomConfigDefaults = {
   'negotiation_timeout_secs': 120,
   'repayment_interest_rate': 0.000,
   'loans_enabled': false,
-  'max_loans_per_player': 3,
   'async_turn_timeout_hours': null,
   'async_turn_reminder_hours': null,
 };
@@ -139,7 +138,11 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     try {
       final updates = Map<String, dynamic>.from(_config)
         ..remove('room_id')
-        ..remove('created_at');
+        ..remove('created_at')
+        // debug_mode is owned exclusively by the lobby's debug toggle
+        // (_setDebugMode). This sheet snapshots _config on open and would
+        // otherwise write a stale value back, clobbering a concurrent toggle.
+        ..remove('debug_mode');
       await ref.read(gameServiceProvider).updateConfig(widget.roomId, updates);
     } on GameServiceException catch (e) {
       if (mounted) {
@@ -466,7 +469,6 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
     final auctionStyle = _config['auction_style'] as String? ?? 'ascending';
     final winCondition = _config['winning_condition'] as String? ?? 'last_player_standing';
     final allowNeg = _config['allow_bankruptcy_negotiation'] as bool? ?? false;
-    final loansEnabled = _config['loans_enabled'] as bool? ?? false;
 
     ref.listen(resetConfigKeyProvider(widget.roomId), (_, key) {
       if (key != null && mounted) {
@@ -627,7 +629,7 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Lowest price before auction ends',
               enabled: auctionOnDecline && auctionStyle == 'dutch'),
         ]),
-        _section('Trading', ['trade_any_turn', 'multi_party_trades', 'trade_futures', 'trade_timeout_secs'], [
+        _section('Trading', ['trade_any_turn', 'multi_party_trades', 'trade_futures', 'trade_timeout_secs', 'loans_enabled'], [
           _switchTile('trade_any_turn', 'Trade at any time',
               subtitle: 'Trades allowed outside own turn'),
           _switchTile('multi_party_trades', 'Multi-party trades',
@@ -636,6 +638,8 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Trade future rent exemptions'),
           _nullIntTile('trade_timeout_secs', 'Trade timeout', 'No timeout',
               subtitle: 'Seconds to accept a trade offer'),
+          _switchTile('loans_enabled', 'Loans enabled',
+              subtitle: 'Players can lend cash to each other as part of a trade'),
         ]),
         _section('Winning Condition', ['winning_condition', 'net_worth_target', 'net_worth_check', 'turn_limit', 'time_limit_mins'], [
           _enumTile('winning_condition', 'Win condition', [
@@ -672,12 +676,6 @@ class _LobbySettingsSheetState extends ConsumerState<LobbySettingsSheet> {
               subtitle: 'Seconds to reach a deal', enabled: allowNeg),
           _rateTile('repayment_interest_rate', 'Repayment interest',
               subtitle: 'Interest rate on negotiated repayment plan', enabled: allowNeg),
-        ]),
-        _section('Loans', ['loans_enabled', 'max_loans_per_player'], [
-          _switchTile('loans_enabled', 'Loans enabled',
-              subtitle: 'Players can borrow from the bank'),
-          _intTile('max_loans_per_player', 'Max loans per player',
-              subtitle: 'Outstanding loan limit per player', enabled: loansEnabled),
         ]),
         _section('Async Play', ['async_turn_timeout_hours', 'async_turn_reminder_hours'], [
           _nullIntTile('async_turn_timeout_hours', 'Turn timeout', 'No expiry',

@@ -18,6 +18,15 @@ class GameActivityLog extends ConsumerWidget {
     return 'square $idx';
   }
 
+  // Renders a flat interest rate (0.1 -> "10%", 0.125 -> "12.5%").
+  static String _formatRate(double rate) {
+    final pct = rate * 100;
+    final str = pct == pct.roundToDouble()
+        ? pct.round().toString()
+        : pct.toStringAsFixed(1);
+    return '$str%';
+  }
+
   static String _formatRoll(String name, Map<String, dynamic> p) {
     final roll = (p['roll'] as List<dynamic>?)?.cast<int>() ?? [];
     final total = roll.fold(0, (a, b) => a + b);
@@ -74,6 +83,9 @@ class GameActivityLog extends ConsumerWidget {
       GameAction.rejectTrade        => '$name rejected a trade offer',
       GameAction.counterTrade       => '$name countered a trade offer',
       GameAction.cancelTrade        => '$name cancelled their trade offer',
+      GameAction.loanRepayment      => '$name repaid £${payload['amount']} to ${nameOf(payload['creditor_id'] as String?)}'
+                                        '${payload['instalments_remaining'] != null ? ' (${payload['instalments_remaining']} left)' : ''}',
+      GameAction.loanRepaid         => '$name cleared their loan from ${nameOf(payload['creditor_id'] as String?)}',
       GameAction.endTurn            => null,
       _                             => '$name: $action',
     };
@@ -107,6 +119,8 @@ class GameActivityLog extends ConsumerWidget {
       GameAction.rejectTrade        => (Icons.cancel_outlined, Colors.red),
       GameAction.cancelTrade        => (Icons.cancel_outlined, Colors.grey),
       GameAction.counterTrade       => (Icons.swap_horiz, Colors.orange),
+      GameAction.loanRepayment      => (Icons.payments, Colors.teal),
+      GameAction.loanRepaid         => (Icons.price_check, Colors.green),
       _                             => (Icons.info_outline, Colors.grey),
     };
   }
@@ -148,6 +162,17 @@ class GameActivityLog extends ConsumerWidget {
         final desc = multiParty
             ? 'Rent immunity for $turns (from ${nameOf(from)})'
             : 'Rent immunity for $turns';
+        items.add(desc);
+      }
+      final loan = LoanTerms.tryParse(leg['loan']);
+      if (loan != null) {
+        final turns = loan.turns == 1 ? '1 turn' : '${loan.turns} turns';
+        final rate = _formatRate(loan.interestRate);
+        final terms =
+            'repay £${loan.totalRepayable} over $turns ($rate interest, £${loan.instalment}/turn)';
+        final desc = multiParty
+            ? 'Loan of £${loan.amount} from ${nameOf(from)} — $terms'
+            : 'Loan of £${loan.amount} — $terms';
         items.add(desc);
       }
     }

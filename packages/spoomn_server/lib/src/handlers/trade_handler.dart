@@ -1,8 +1,13 @@
+import 'dart:math';
+
 import 'package:shelf/shelf.dart';
 import 'package:spoomn_core/spoomn_core.dart';
 
 import '../db/supabase_client.dart';
 import '../middleware/auth_middleware.dart';
+
+String _genPlanId() =>
+    'loan-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
 
 Future<void> _writeLog(String roomId, String playerId, int turnNumber, String action, Map<String, dynamic> payload) async {
   await supabase.from('game_log').insert({
@@ -53,12 +58,28 @@ Future<Response> proposeTrade(
   final ownership = stateRow['property_ownership'] as Map<String, dynamic>;
   final balances = stateRow['balances'] as Map<String, dynamic>;
   final goojfCards = stateRow['get_out_of_jail_cards'] as Map<String, dynamic>;
+  final loansEnabled = config['loans_enabled'] as bool? ?? false;
 
   for (final leg in legs) {
     final from = leg['from'] as String;
     final properties = (leg['properties'] as List?)?.cast<int>() ?? [];
     final money = (leg['money'] as int?) ?? 0;
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
+    final loan = LoanTerms.tryParse(leg['loan']);
+
+    if (leg['loan'] != null && loan == null) {
+      return errorJson(400, 'INVALID_LOAN',
+          'Loan needs a positive value and turn count',);
+    }
+    if (loan != null) {
+      if (!loansEnabled) {
+        return errorJson(400, 'RULE_VIOLATION', 'Loans are not enabled in this game');
+      }
+      if (((balances[from] as int?) ?? 0) < money + loan.amount) {
+        return errorJson(400, 'INSUFFICIENT_FUNDS',
+            'Lender cannot cover the loan value',);
+      }
+    }
 
     for (final prop in properties) {
       if (prop < 0 || prop >= Board.boardSize) {
@@ -124,6 +145,7 @@ Future<Response> acceptTrade(
   String roomId,
   String playerId,
   Map<String, dynamic> payload,
+  Map<String, dynamic> config,
 ) async {
   final tradeId = payload['trade_id'] as String?;
   if (tradeId == null) return errorJson(400, 'MISSING_FIELD', 'trade_id required');
@@ -180,12 +202,35 @@ Future<Response> acceptTrade(
       stateRow['get_out_of_jail_cards'] as Map<String, dynamic>,);
   final rentModifiers = Map<String, dynamic>.from(
       stateRow['rent_modifiers'] as Map<String, dynamic>,);
+  final repaymentPlans = List<dynamic>.from(
+      stateRow['repayment_plans'] as List? ?? const [],);
+  final loansEnabled = config['loans_enabled'] as bool? ?? false;
 
   for (final leg in legs) {
     final from = leg['from'] as String;
     final properties = (leg['properties'] as List?)?.cast<int>() ?? [];
     final money = (leg['money'] as int?) ?? 0;
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
+    final loan = LoanTerms.tryParse(leg['loan']);
+
+    if (loan != null) {
+      if (!loansEnabled) {
+        await supabase.from('pending_trades').update({
+          'status': 'cancelled',
+          'resolved_at': DateTime.now().toIso8601String(),
+        }).eq('id', tradeId);
+        return errorJson(400, 'RULE_VIOLATION',
+            'Loans are no longer enabled — trade cancelled',);
+      }
+      if (((balances[from] as int?) ?? 0) < money + loan.amount) {
+        await supabase.from('pending_trades').update({
+          'status': 'cancelled',
+          'resolved_at': DateTime.now().toIso8601String(),
+        }).eq('id', tradeId);
+        return errorJson(400, 'INSUFFICIENT_FUNDS',
+            'Lender $from can no longer fund the loan — cancelled',);
+      }
+    }
 
     for (final prop in properties) {
       if (prop < 0 || prop >= Board.boardSize) {
@@ -229,9 +274,27 @@ Future<Response> acceptTrade(
     final money = (leg['money'] as int?) ?? 0;
     final jailCards = (leg['jail_cards'] as int?) ?? 0;
     final immunityTurns = (leg['rent_immunity_turns'] as int?) ?? 0;
+    final loan = LoanTerms.tryParse(leg['loan']);
 
     for (final prop in properties) {
       ownership['$prop'] = to;
+    }
+
+    if (loan != null) {
+      // Lender funds the borrower now; borrower repays in instalments on each
+      // of their turns via _processRepayments in action_handler.
+      balances[from] = ((balances[from] as int?) ?? 0) - loan.amount;
+      balances[to] = ((balances[to] as int?) ?? 0) + loan.amount;
+      repaymentPlans.add({
+        'plan_id': _genPlanId(),
+        'debtor_id': to,
+        'creditor_id': from,
+        'instalment_amount': loan.instalment,
+        'instalments_remaining': loan.turns,
+        'origin': 'loan',
+        'principal': loan.amount,
+        'interest_rate': loan.interestRate,
+      });
     }
 
     if (money > 0) {
@@ -282,6 +345,7 @@ Future<Response> acceptTrade(
     'balances': balances,
     'get_out_of_jail_cards': goojfCards,
     'rent_modifiers': rentModifiers,
+    'repayment_plans': repaymentPlans,
     'updated_at': DateTime.now().toIso8601String(),
   }).eq('room_id', roomId);
 

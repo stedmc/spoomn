@@ -77,7 +77,7 @@ Future<Response> handleAction(Request request, String playerId) async {
     'jailbreak'              => _jailbreak(roomId, effectivePlayerId, stateRow, configRow),
     'end_turn'               => _endTurn(roomId, effectivePlayerId, stateRow, configRow, roomRow),
     'propose_trade'          => trade.proposeTrade(roomId, effectivePlayerId, payload, configRow),
-    'accept_trade'           => trade.acceptTrade(roomId, effectivePlayerId, payload),
+    'accept_trade'           => trade.acceptTrade(roomId, effectivePlayerId, payload, configRow),
     'reject_trade'           => trade.rejectTrade(roomId, effectivePlayerId, payload),
     'cancel_trade'           => trade.cancelTrade(roomId, effectivePlayerId, payload),
     'counter_trade'          => trade.counterTrade(roomId, effectivePlayerId, payload, configRow),
@@ -458,22 +458,14 @@ Future<Response> _endTurn(
     return errorJson(403, 'NOT_YOUR_TURN', 'Not your turn');
   }
 
-  // Process repayment instalments due this turn
-  final repaymentResult = await _processRepayments(roomId, playerId, state, config);
-  if (repaymentResult != null) return repaymentResult; // bankruptcy triggered
-
-  // Reload state in case repayments mutated it
-  final freshState = await supabase
-      .from('game_state')
-      .select()
-      .eq('room_id', roomId)
-      .single();
-
-  // Check doubles extra turn
+  // Check doubles extra turn. A doubles continuation keeps the same player on
+  // the same turn, so it must happen BEFORE loan repayments are processed --
+  // otherwise a player who rolls doubles pays an extra instalment per roll
+  // instead of once per turn.
   final doublesEnabled = config['doubles_enabled'] as bool? ?? true;
   final doublesExtraTurn = config['doubles_extra_turn'] as bool? ?? true;
-  final diceRoll = freshState['dice_roll'] as List<dynamic>?;
-  final consecutiveDoubles = freshState['consecutive_doubles'] as int? ?? 0;
+  final diceRoll = state['dice_roll'] as List<dynamic>?;
+  final consecutiveDoubles = state['consecutive_doubles'] as int? ?? 0;
   final rolledDoubles = doublesEnabled &&
       doublesExtraTurn &&
       diceRoll != null &&
@@ -490,6 +482,17 @@ Future<Response> _endTurn(
     }).eq('room_id', roomId);
     return okJson({'turn_ended': false, 'reason': 'doubles_extra_turn'});
   }
+
+  // The turn is really ending now -- process repayment instalments due this turn.
+  final repaymentResult = await _processRepayments(roomId, playerId, state, config);
+  if (repaymentResult != null) return repaymentResult; // bankruptcy triggered
+
+  // Reload state in case repayments mutated it
+  final freshState = await supabase
+      .from('game_state')
+      .select()
+      .eq('room_id', roomId)
+      .single();
 
   // Advance to next player
   final players = await supabase
@@ -614,6 +617,22 @@ Future<Response?> _processRepayments(
         'balances': balances,
         'repayment_plans': updatedPlans,
       }).eq('room_id', roomId);
+
+      final turnNumber = state['turn_number'] as int? ?? 0;
+      await _writeLog(roomId, playerId, turnNumber, 'loan_repayment', {
+        'creditor_id': creditorId,
+        'amount': instalmentAmount,
+        'instalments_remaining': remaining < 0 ? 0 : remaining,
+        'principal': plan['principal'],
+        'plan_id': plan['plan_id'],
+      });
+      if (remaining <= 0) {
+        await _writeLog(roomId, playerId, turnNumber, 'loan_repaid', {
+          'creditor_id': creditorId,
+          'principal': plan['principal'],
+          'plan_id': plan['plan_id'],
+        });
+      }
     } else {
       // Missed instalment → bankruptcy
       // TODO: liquidate assets then declare bankruptcy

@@ -64,6 +64,52 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
     return icons;
   }
 
+  /// Icons summarising this player's outstanding trade loans: money owed
+  /// (as borrower) and money owed to them (as lender).
+  List<Widget> _buildLoanIcons(
+    GameState? state,
+    String playerId,
+    List<RoomPlayer> allPlayers,
+  ) {
+    if (state == null) return [];
+    final loans = state.repaymentPlans
+        .cast<Map<String, dynamic>>()
+        .where((p) => p['origin'] == 'loan')
+        .toList();
+    if (loans.isEmpty) return [];
+
+    String nameOf(String? id) => id == null
+        ? 'a player'
+        : allPlayers.where((pl) => pl.playerId == id).firstOrNull?.displayName ??
+            'a player';
+
+    final icons = <Widget>[];
+    for (final loan in loans) {
+      final debtorId = loan['debtor_id'] as String?;
+      final creditorId = loan['creditor_id'] as String?;
+      final instalment = (loan['instalment_amount'] as num?)?.toInt() ?? 0;
+      final left = (loan['instalments_remaining'] as num?)?.toInt() ?? 0;
+      final turns = '$left turn${left == 1 ? '' : 's'}';
+
+      if (debtorId == playerId) {
+        icons.add(Tooltip(
+          message: 'Repaying a loan: £$instalment/turn for $turns '
+              'to ${nameOf(creditorId)}',
+          child: const Icon(Icons.trending_down, size: 12, color: Colors.redAccent),
+        ));
+      } else if (creditorId == playerId) {
+        icons.add(Tooltip(
+          message: 'Loan owed to you: £$instalment/turn for $turns '
+              'from ${nameOf(debtorId)}',
+          child:
+              const Icon(Icons.trending_up, size: 12, color: Colors.greenAccent),
+        ));
+      }
+    }
+    if (icons.isNotEmpty) icons.add(const SizedBox(width: 4));
+    return icons;
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawPlayers = ref.watch(roomPlayersProvider(widget.roomId)).value ?? [];
@@ -188,6 +234,7 @@ class _GamePlayerStripState extends ConsumerState<GamePlayerStrip> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    ..._buildLoanIcons(state, p.playerId, players),
                     ..._buildImmunityIcons(state, p.playerId, players),
                     if (delta != null)
                       Text(

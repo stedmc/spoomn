@@ -269,11 +269,6 @@ class GamePropertyCard extends ConsumerWidget {
                     _textRow('2 Utilities', '10× dice', isActive: ownedUtilityCount == 2),
                   ],
                   if (square.taxAmount != null) Text('Tax: £${square.taxAmount}'),
-                  if (square.price == null &&
-                      square.taxAmount == null &&
-                      square.type != SquareType.chance &&
-                      square.type != SquareType.communityChest)
-                    Text(square.type.name, style: const TextStyle(color: Colors.grey)),
                 ],
               ),
             ),

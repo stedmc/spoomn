@@ -178,20 +178,35 @@ Stream<List<ActiveTrap>> activeTraps(Ref ref, String roomId) {
 // ---------------------------------------------------------------------------
 
 final roomConfigProvider = StreamProvider.family<Map<String, dynamic>?, String>((ref, roomId) async* {
-  // Always yield from the REST fetch so the UI never gets stuck on a spinner
-  // while waiting for the realtime stream's first event. If the row doesn't
-  // exist yet (race during room creation), yield an empty map so default rules
-  // are displayed immediately.
-  try {
-    final row = await Supabase.instance.client
-        .from('room_configs')
-        .select()
-        .eq('room_id', roomId)
-        .maybeSingle();
-    yield row ?? {};
-  } catch (_) {
-    yield {};
+  Future<Map<String, dynamic>?> fetch() async {
+    try {
+      return await Supabase.instance.client
+          .from('room_configs')
+          .select()
+          .eq('room_id', roomId)
+          .maybeSingle();
+    } catch (_) {
+      return null;
+    }
   }
+
+  // Yield from the REST fetch so the UI never gets stuck on a spinner while
+  // waiting for the realtime stream's first event. If the row isn't readable
+  // yet, yield an empty map so default rules render immediately.
+  var row = await fetch();
+  yield row ?? {};
+
+  // The row can be briefly unreadable right after navigating into the game
+  // (auth/RLS/membership race, especially when game_screen invalidates this
+  // provider on mount). Retry so a transient miss doesn't leave debug_mode --
+  // and every other config value -- stuck at its default until someone edits
+  // the config again.
+  for (var attempt = 0; row == null && attempt < 5; attempt++) {
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    row = await fetch();
+    if (row != null) yield row;
+  }
+
   yield* Supabase.instance.client
       .from('room_configs')
       .stream(primaryKey: ['room_id'])

@@ -91,9 +91,6 @@ abstract class RoomConfig with _$RoomConfig {
     @Default(0.0) double repaymentInterestRate,
     // Loans
     @Default(false) bool loansEnabled,
-    @Default(200) int loanAmount,
-    @Default(0.1) double loanInterestRate,
-    @Default(3) int maxLoansPerPlayer,
     // Async
     int? asyncTurnTimeoutHours,
     int? asyncTurnReminderHours,

@@ -240,7 +240,7 @@ class BoardComponent extends PositionComponent with HasGameReference {
       canvas.clipRect(rect);
       potTp.paint(
         canvas,
-        Offset(rect.center.dx - potTp.width / 2, rect.center.dy + 4),
+        Offset(rect.center.dx - potTp.width / 2, rect.top + 4),
       );
       canvas.restore();
     }

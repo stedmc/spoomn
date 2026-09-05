@@ -62,7 +62,7 @@ class SpoomnGame extends FlameGame with MouseMovementDetector, TapCallbacks {
   final ValueNotifier<Map<String, Color>> playerColoursNotifier = ValueNotifier({});
 
   double boardFontSize = 12.0;
-  BoardColorScheme colorScheme = BoardColorScheme.classic;
+  BoardColorScheme colorScheme = BoardColorScheme.pastel;
   bool freeParkingJackpotEnabled = false;
 
   void setBoardFontSize(double size) {
