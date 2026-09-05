@@ -245,10 +245,11 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     final isStarting = room?.status == GameRoomStatus.starting;
     final myId = ref.watch(currentUserIdProvider) ?? '';
 
-    // Narrow + portrait only — a phone rotated to landscape gets the normal
-    // desktop-style layout with the side panel.
+    // Portrait = mobile layout, landscape = desktop layout — a phone
+    // rotated to landscape gets the normal desktop-style layout with the
+    // side panel.
     final screenSize = MediaQuery.sizeOf(context);
-    final isMobile = screenSize.width < 850 && screenSize.width < screenSize.height;
+    final isMobile = screenSize.height > screenSize.width;
     const sidePanelWidth = 310.0;
     // Clears the turn-indicator badge (top:12 + ~32 tall + gap) so the board
     // sits just below it instead of overlapping.
