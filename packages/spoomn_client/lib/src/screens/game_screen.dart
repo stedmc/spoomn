@@ -13,6 +13,7 @@ import '../services/game_service.dart';
 import '../widgets/game/card_draw_overlay.dart';
 import '../widgets/game/game_constants.dart';
 import '../widgets/game/game_toast.dart';
+import '../widgets/game/mobile_tray.dart';
 import '../widgets/game/order_reveal_overlay.dart';
 import '../widgets/game/property_card.dart';
 import '../widgets/game/settings_sheet.dart';
@@ -244,18 +245,34 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     final isStarting = room?.status == GameRoomStatus.starting;
     final myId = ref.watch(currentUserIdProvider) ?? '';
 
+    // Narrow + portrait only — a phone rotated to landscape gets the normal
+    // desktop-style layout with the side panel.
+    final screenSize = MediaQuery.sizeOf(context);
+    final isMobile = screenSize.width < 600 && screenSize.width < screenSize.height;
+    const sidePanelWidth = 310.0;
+
     return Scaffold(
       body: Stack(
         children: [
-          Row(
-            children: [
-              Expanded(child: GameWidget(game: _game)),
-              SizedBox(
-                width: 310,
-                child: GameSidePanel(roomId: widget.roomId, game: _game, isAnimating: _isAnimating),
-              ),
-            ],
-          ),
+          if (isMobile)
+            GameWidget(game: _game)
+          else
+            Row(
+              children: [
+                Expanded(child: GameWidget(game: _game)),
+                SizedBox(
+                  width: sidePanelWidth,
+                  child: GameSidePanel(roomId: widget.roomId, game: _game, isAnimating: _isAnimating),
+                ),
+              ],
+            ),
+          if (isMobile)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: GameMobileTray(roomId: widget.roomId, game: _game, isAnimating: _isAnimating),
+            ),
           // Turn indicator — top-left of board area
           Positioned(
             top: 12,
@@ -271,8 +288,13 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
               if (squareIdx == null || anchor == null) return const SizedBox.shrink();
               const cardW = 220.0;
               const cardH = 360.0;
-              final screenSize = MediaQuery.sizeOf(context);
-              final popupPos = _smartPopupPos(anchor, cardW, cardH, screenSize);
+              final popupPos = _smartPopupPos(
+                anchor,
+                cardW,
+                cardH,
+                screenSize,
+                isMobile ? 0 : sidePanelWidth,
+              );
               return Positioned(
                 left: popupPos.dx,
                 top: popupPos.dy,
@@ -286,7 +308,7 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
             Positioned(
               top: 72,
               left: 0,
-              right: 310,
+              right: isMobile ? 0 : sidePanelWidth,
               child: Center(
                 child: GameToastBanner(
                   key: _toasts.first.key,
@@ -344,21 +366,22 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
               winnerId: _endGameWinnerId,
               roomId: widget.roomId,
             ),
-          Positioned(
-            bottom: 12,
-            left: 12,
-            child: IconButton(
-              icon: const Icon(Icons.settings, size: 20),
-              tooltip: 'Settings',
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
-              ),
-              onPressed: () => showModalBottomSheet<void>(
-                context: context,
-                builder: (_) => const GameSettingsSheet(),
+          if (!isMobile)
+            Positioned(
+              bottom: 12,
+              left: 12,
+              child: IconButton(
+                icon: const Icon(Icons.settings, size: 20),
+                tooltip: 'Settings',
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHigh,
+                ),
+                onPressed: () => showModalBottomSheet<void>(
+                  context: context,
+                  builder: (_) => const GameSettingsSheet(),
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -491,8 +514,8 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     };
   }
 
-  Offset _smartPopupPos(Offset anchor, double cardW, double cardH, Size screen) {
-    final boardW = screen.width - 310;
+  Offset _smartPopupPos(Offset anchor, double cardW, double cardH, Size screen, double sidePanelWidth) {
+    final boardW = screen.width - sidePanelWidth;
     double left;
     if (anchor.dx + 16 + cardW > boardW) {
       left = (anchor.dx - cardW - 16).clamp(0.0, screen.width - cardW);
