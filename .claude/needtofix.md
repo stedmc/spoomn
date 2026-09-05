@@ -1,6 +1,12 @@
-- need to clean old database entries: 
+- need a service to clean old database entries: 
     - old guest profiles that aren't in any games in over 1 day
     - old games with only guest profiles that haven't had any activity in over 14 days
     - game rooms should be completed after game complete
     - old incomplete games if no activity for 1 month
-    
+    - etc.
+    - all tables need to be cleaned up
+    - we need to ensure statistics are stored and updated as figures before things are deleted
+- more stats to track (if not already):
+    - total squares moved
+    - total squares moved backwards
+    - number of games

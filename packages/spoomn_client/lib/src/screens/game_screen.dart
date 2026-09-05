@@ -248,14 +248,27 @@ class _GameScreenState extends ConsumerState<GameScreen> with WidgetsBindingObse
     // Narrow + portrait only — a phone rotated to landscape gets the normal
     // desktop-style layout with the side panel.
     final screenSize = MediaQuery.sizeOf(context);
-    final isMobile = screenSize.width < 600 && screenSize.width < screenSize.height;
+    final isMobile = screenSize.width < 850 && screenSize.width < screenSize.height;
     const sidePanelWidth = 310.0;
+    // Clears the turn-indicator badge (top:12 + ~32 tall + gap) so the board
+    // sits just below it instead of overlapping.
+    const mobileBoardTopOffset = 56.0;
 
     return Scaffold(
       body: Stack(
         children: [
           if (isMobile)
-            GameWidget(game: _game)
+            Padding(
+              padding: EdgeInsets.only(top: mobileBoardTopOffset),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: screenSize.width,
+                  height: screenSize.width,
+                  child: GameWidget(game: _game),
+                ),
+              ),
+            )
           else
             Row(
               children: [
