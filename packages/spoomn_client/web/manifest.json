@@ -1,11 +1,11 @@
 {
-    "name": "spoomn_client",
-    "short_name": "spoomn_client",
+    "name": "Spoomn",
+    "short_name": "Spoomn",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Let's play Spoomn",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
